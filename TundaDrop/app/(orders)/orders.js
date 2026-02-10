@@ -4,6 +4,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useOrdersStore } from "../../src/store/ordersStore";
 
+// ✅ NEW imports for logout + clearing user data
+import { useAuthStore } from "../../src/store/authStore";
+import { useCartStore } from "../../src/store/cartStore";
+import { useCheckoutStore } from "../../src/store/checkoutStore";
+
 function formatDate(iso) {
   try {
     const d = new Date(iso);
@@ -34,8 +39,29 @@ function statusLabel(status) {
 
 export default function Orders() {
   const router = useRouter();
+
   const orders = useOrdersStore((s) => s.orders);
   const clearOrders = useOrdersStore((s) => s.clearOrders);
+
+  // ✅ NEW: clear other stores + logout
+  const logout = useAuthStore((s) => s.logout);
+  const clearCart = useCartStore((s) => s.clear);
+
+  // NOTE: checkoutStore must have reset(). If yours is named differently, tell me and I’ll match it.
+  const resetCheckout = useCheckoutStore((s) => s.reset);
+
+  async function onLogout() {
+    // Clear personal data first
+    clearOrders();
+    clearCart();
+    resetCheckout();
+
+    // Then sign out (Supabase)
+    await logout();
+
+    // Optional: send user somewhere nice after logout
+    router.replace("/");
+  }
 
   if (orders.length === 0) {
     return (
@@ -58,6 +84,11 @@ export default function Orders() {
         >
           <Text style={{ color: "#fff", fontWeight: "900" }}>Browse juices</Text>
         </Pressable>
+
+        {/* ✅ NEW: logout also visible here */}
+        <Pressable onPress={onLogout} style={{ marginTop: 10 }}>
+          <Text style={{ fontWeight: "900" }}>Logout</Text>
+        </Pressable>
       </View>
     );
   }
@@ -73,9 +104,17 @@ export default function Orders() {
         }}
       >
         <Text style={{ fontSize: 20, fontWeight: "900" }}>My Orders</Text>
-        <Pressable onPress={clearOrders}>
-          <Text style={{ fontWeight: "900" }}>Clear</Text>
-        </Pressable>
+
+        {/* ✅ NEW: Clear + Logout */}
+        <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+          <Pressable onPress={clearOrders}>
+            <Text style={{ fontWeight: "900" }}>Clear</Text>
+          </Pressable>
+
+          <Pressable onPress={onLogout}>
+            <Text style={{ fontWeight: "900" }}>Logout</Text>
+          </Pressable>
+        </View>
       </View>
 
       <View style={{ gap: 12, paddingBottom: 24 }}>
@@ -112,9 +151,7 @@ export default function Orders() {
                 <Text style={{ fontWeight: "900" }} numberOfLines={1}>
                   {o.id}
                 </Text>
-                <Text style={{ color: "#444", marginTop: 2 }}>
-                  {formatDate(o.createdAt)}
-                </Text>
+                <Text style={{ color: "#444", marginTop: 2 }}>{formatDate(o.createdAt)}</Text>
               </View>
 
               <View
@@ -125,16 +162,12 @@ export default function Orders() {
                   backgroundColor: "#111827",
                 }}
               >
-                <Text style={{ color: "#fff", fontWeight: "900" }}>
-                  {statusLabel(o.status)}
-                </Text>
+                <Text style={{ color: "#fff", fontWeight: "900" }}>{statusLabel(o.status)}</Text>
               </View>
             </View>
 
             <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-              <Text style={{ color: "#444", fontWeight: "800" }}>
-                {o.items.length} item(s)
-              </Text>
+              <Text style={{ color: "#444", fontWeight: "800" }}>{o.items.length} item(s)</Text>
               <Text style={{ fontWeight: "900" }}>KES {o.pricing.totalKes}</Text>
             </View>
 

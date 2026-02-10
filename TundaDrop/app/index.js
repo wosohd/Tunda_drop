@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   Pressable,
   Image,
   Animated,
+  TextInput,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -33,13 +34,42 @@ function ScalePress({ children, onPress, style }) {
   );
 }
 
+function normalize(s) {
+  return (s ?? "").toString().toLowerCase().trim();
+}
+
 export default function Home() {
   const router = useRouter();
 
+  const [query, setQuery] = useState("");
+
   const featured = useMemo(() => PRODUCTS.slice(0, 6), []);
 
+  const results = useMemo(() => {
+    const q = normalize(query);
+    if (!q) return [];
+
+    // search name + description + characteristics
+    return PRODUCTS.filter((p) => {
+      const hay = [
+        p.name,
+        p.description,
+        ...(p.characteristics ?? []),
+      ]
+        .map(normalize)
+        .join(" ");
+
+      return hay.includes(q);
+    }).slice(0, 8); // keep it tight on home
+  }, [query]);
+
+  const showResults = query.trim().length > 0;
+
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Hero */}
       <LinearGradient
         colors={["#00D1FF", "#7C4DFF", "#FF3D81"]}
@@ -93,24 +123,86 @@ export default function Home() {
           </ScalePress>
         </View>
 
-        {/* Search (UI only for now) */}
+        {/* Search (REAL) */}
         <View
           style={{
             marginTop: 14,
             borderRadius: 18,
             backgroundColor: "rgba(255,255,255,0.22)",
             paddingHorizontal: 14,
-            paddingVertical: 12,
+            paddingVertical: 10,
             flexDirection: "row",
             alignItems: "center",
             gap: 10,
           }}
         >
           <Ionicons name="search" size={18} color="rgba(255,255,255,0.95)" />
-          <Text style={{ color: "rgba(255,255,255,0.95)" }}>
-            Search mango, detox, cocktails…
-          </Text>
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search mango, detox, cocktails…"
+            placeholderTextColor="rgba(255,255,255,0.8)"
+            style={{ flex: 1, color: "#fff", fontWeight: "700" }}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {!!query && (
+            <Pressable onPress={() => setQuery("")} hitSlop={10}>
+              <Ionicons name="close-circle" size={18} color="rgba(255,255,255,0.95)" />
+            </Pressable>
+          )}
         </View>
+
+        {/* Search results (inside hero for a futuristic feel) */}
+        {showResults && (
+          <View
+            style={{
+              marginTop: 10,
+              borderRadius: 18,
+              backgroundColor: "rgba(17,24,39,0.30)",
+              borderWidth: 1,
+              borderColor: "rgba(255,255,255,0.22)",
+              overflow: "hidden",
+            }}
+          >
+            {results.length === 0 ? (
+              <View style={{ padding: 12 }}>
+                <Text style={{ color: "#fff", fontWeight: "900" }}>
+                  No matches
+                </Text>
+                <Text style={{ color: "rgba(255,255,255,0.9)", marginTop: 4 }}>
+                  Try “mango”, “cocktail”, “pulpy”, “detox”.
+                </Text>
+              </View>
+            ) : (
+              results.map((p) => (
+                <Pressable
+                  key={p.id}
+                  onPress={() => router.push(`/(shop)/product/${p.id}`)}
+                  style={{
+                    padding: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: "rgba(255,255,255,0.12)",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 10,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: "#fff", fontWeight: "900" }} numberOfLines={1}>
+                      {p.name}
+                    </Text>
+                    <Text style={{ color: "rgba(255,255,255,0.9)", marginTop: 2 }}>
+                      From KES {p.variants?.[0]?.price ?? "-"}
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color="#fff" />
+                </Pressable>
+              ))
+            )}
+          </View>
+        )}
 
         <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
           <ScalePress onPress={() => router.push("/(shop)/categories")}>
@@ -159,7 +251,10 @@ export default function Home() {
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: "row", gap: 10, paddingBottom: 12 }}>
           {CATEGORIES.map((c) => (
-            <ScalePress key={c.id} onPress={() => router.push("/(shop)/categories")}>
+            <ScalePress
+              key={c.id}
+              onPress={() => router.push("/(shop)/categories")}
+            >
               <View
                 style={{
                   paddingHorizontal: 12,
@@ -212,10 +307,7 @@ export default function Home() {
                 borderColor: "#EEF1FF",
               }}
             >
-              <Image
-                source={{ uri: p.image }}
-                style={{ height: 140, width: "100%" }}
-              />
+              <Image source={{ uri: p.image }} style={{ height: 140, width: "100%" }} />
               <View style={{ padding: 14 }}>
                 <Text style={{ fontSize: 16, fontWeight: "900" }}>{p.name}</Text>
                 <Text style={{ marginTop: 4, color: "#444" }} numberOfLines={2}>
@@ -246,9 +338,7 @@ export default function Home() {
                     }}
                   >
                     <Ionicons name="sparkles" size={16} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "900" }}>
-                      View
-                    </Text>
+                    <Text style={{ color: "#fff", fontWeight: "900" }}>View</Text>
                   </View>
                 </View>
               </View>
