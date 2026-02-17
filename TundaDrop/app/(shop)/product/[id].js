@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
   View,
-  Text,
   Image,
   ScrollView,
   Pressable,
@@ -12,6 +11,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { PRODUCTS, CATEGORIES } from "../../../src/constants/mockData";
 import { useCartStore } from "../../../src/store/cartStore";
+import { TText } from "../../../src/components/ui/TText"; // ✅ added (adjust if needed)
 
 function ScalePress({ children, onPress, style }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -51,7 +51,9 @@ export default function Product() {
   if (!product) {
     return (
       <View style={{ flex: 1, justifyContent: "center" }}>
-        <Text style={{ fontSize: 18, fontWeight: "800" }}>Product not found.</Text>
+        <TText style={{ fontSize: 18, fontWeight: "800" }}>
+          Product not found.
+        </TText>
       </View>
     );
   }
@@ -73,16 +75,18 @@ export default function Product() {
             padding: 14,
           }}
         >
-          <Text style={{ color: "#fff", fontSize: 22, fontWeight: "900" }}>
+          <TText style={{ color: "#fff", fontSize: 22, fontWeight: "900" }}>
             {product.name}
-          </Text>
-          <Text style={{ color: "rgba(255,255,255,0.9)", marginTop: 4 }}>
+          </TText>
+          <TText style={{ color: "rgba(255,255,255,0.9)", marginTop: 4 }}>
             {categoryLabel}
-          </Text>
+          </TText>
         </LinearGradient>
       </View>
 
-      <Text style={{ marginTop: 12, color: "#444" }}>{product.description}</Text>
+      <TText muted style={{ marginTop: 12 }}>
+        {product.description}
+      </TText>
 
       {/* Tags */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
@@ -98,15 +102,16 @@ export default function Product() {
               borderColor: "#E7EBFF",
             }}
           >
-            <Text style={{ fontWeight: "800" }}>{t}</Text>
+            <TText style={{ fontWeight: "800" }}>{t}</TText>
           </View>
         ))}
       </View>
 
       {/* Variant selector */}
-      <Text style={{ marginTop: 16, fontSize: 16, fontWeight: "900" }}>
+      <TText style={{ marginTop: 16, fontSize: 16, fontWeight: "900" }}>
         Choose size
-      </Text>
+      </TText>
+
       <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
         {product.variants.map((v, idx) => {
           const active = idx === selectedIndex;
@@ -125,18 +130,19 @@ export default function Product() {
                   borderColor: active ? "#111827" : "#EEF1FF",
                 }}
               >
-                <Text style={{ fontWeight: "900", color: active ? "#fff" : "#111827" }}>
+                <TText style={{ fontWeight: "900", color: active ? "#fff" : undefined }}>
                   {v.sizeLabel}
-                </Text>
-                <Text
+                </TText>
+
+                <TText
                   style={{
                     marginTop: 6,
                     fontWeight: "900",
-                    color: active ? "#fff" : "#111827",
+                    color: active ? "#fff" : undefined,
                   }}
                 >
                   KES {v.price}
-                </Text>
+                </TText>
               </View>
             </ScalePress>
           );
@@ -144,9 +150,10 @@ export default function Product() {
       </View>
 
       {/* Qty */}
-      <Text style={{ marginTop: 16, fontSize: 16, fontWeight: "900" }}>
+      <TText style={{ marginTop: 16, fontSize: 16, fontWeight: "900" }}>
         Quantity
-      </Text>
+      </TText>
+
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10, marginTop: 10 }}>
         <ScalePress onPress={() => setQty((q) => Math.max(1, q - 1))}>
           <View
@@ -176,7 +183,9 @@ export default function Product() {
             paddingHorizontal: 14,
           }}
         >
-          <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>{qty}</Text>
+          <TText style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
+            {qty}
+          </TText>
         </View>
 
         <ScalePress onPress={() => setQty((q) => q + 1)}>
@@ -227,12 +236,12 @@ export default function Product() {
           }}
         >
           <View>
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
+            <TText style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
               Add to cart
-            </Text>
-            <Text style={{ color: "rgba(255,255,255,0.95)", marginTop: 2 }}>
+            </TText>
+            <TText style={{ color: "rgba(255,255,255,0.95)", marginTop: 2 }}>
               Total: KES {priceKes}
-            </Text>
+            </TText>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -246,4 +255,3 @@ export default function Product() {
     </ScrollView>
   );
 }
-

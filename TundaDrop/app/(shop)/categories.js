@@ -1,7 +1,6 @@
 import React, { useMemo, useState, useRef } from "react";
 import {
   View,
-  Text,
   ScrollView,
   Pressable,
   Image,
@@ -10,6 +9,7 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { CATEGORIES, PRODUCTS } from "../../src/constants/mockData";
+import { TText } from "../../src/components/ui/TText";
 
 function ScalePress({ children, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -42,12 +42,13 @@ export default function Categories() {
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
+      <TText style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
         Pick a vibe
-      </Text>
-      <Text style={{ color: "#444", marginBottom: 12 }}>
+      </TText>
+
+      <TText muted style={{ marginBottom: 12 }}>
         Fresh blends, quick delivery. Tap a category to explore.
-      </Text>
+      </TText>
 
       {/* Category pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -69,15 +70,16 @@ export default function Categories() {
                     gap: 8,
                   }}
                 >
-                  <Text style={{ fontSize: 16 }}>{c.emoji}</Text>
-                  <Text
+                  <TText style={{ fontSize: 16 }}>{c.emoji}</TText>
+
+                  <TText
                     style={{
                       fontWeight: "900",
-                      color: isActive ? "#fff" : "#111827",
+                      color: isActive ? "#fff" : undefined,
                     }}
                   >
                     {c.title}
-                  </Text>
+                  </TText>
                 </View>
               </ScalePress>
             );
@@ -105,6 +107,7 @@ export default function Categories() {
                 source={{ uri: p.image }}
                 style={{ height: 140, width: "100%" }}
               />
+
               <View style={{ padding: 14 }}>
                 <View
                   style={{
@@ -114,9 +117,10 @@ export default function Categories() {
                     gap: 10,
                   }}
                 >
-                  <Text style={{ fontSize: 16, fontWeight: "900", flex: 1 }}>
+                  <TText style={{ fontSize: 16, fontWeight: "900", flex: 1 }}>
                     {p.name}
-                  </Text>
+                  </TText>
+
                   <View
                     style={{
                       paddingHorizontal: 10,
@@ -129,17 +133,19 @@ export default function Categories() {
                     }}
                   >
                     <Ionicons name="arrow-forward" size={16} color="#fff" />
-                    <Text style={{ color: "#fff", fontWeight: "900" }}>Open</Text>
+                    <TText style={{ color: "#fff", fontWeight: "900" }}>
+                      Open
+                    </TText>
                   </View>
                 </View>
 
-                <Text style={{ marginTop: 6, color: "#444" }} numberOfLines={2}>
+                <TText muted style={{ marginTop: 6 }} numberOfLines={2}>
                   {p.description}
-                </Text>
+                </TText>
 
-                <Text style={{ marginTop: 10, fontWeight: "900" }}>
+                <TText style={{ marginTop: 10, fontWeight: "900" }}>
                   From KES {p.variants[0].price}
-                </Text>
+                </TText>
               </View>
             </View>
           </ScalePress>

@@ -1,7 +1,6 @@
 import React, { useMemo, useRef } from "react";
 import {
   View,
-  Text,
   ScrollView,
   Pressable,
   TextInput,
@@ -14,8 +13,10 @@ import { useRouter } from "expo-router";
 import { DELIVERY_ZONES } from "../../src/constants/deliveryZones";
 import { useCheckoutStore } from "../../src/store/checkoutStore";
 import { useCartStore } from "../../src/store/cartStore";
-import { useOrdersStore } from "../../src/store/ordersStore"; // ✅ NEW
+import { useOrdersStore } from "../../src/store/ordersStore";
 import { calcTotalsKes } from "../../src/lib/money";
+
+import { TText } from "../../src/components/ui/TText";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
@@ -46,7 +47,7 @@ export default function Checkout() {
   const clearCart = useCartStore((s) => s.clear);
   const getLinesForTotals = useCartStore((s) => s.getLinesForTotals);
 
-  const addOrder = useOrdersStore((s) => s.addOrder); // ✅ NEW
+  const addOrder = useOrdersStore((s) => s.addOrder);
 
   const zoneId = useCheckoutStore((s) => s.zoneId);
   const address = useCheckoutStore((s) => s.address);
@@ -69,7 +70,7 @@ export default function Checkout() {
       discountPercent: DISCOUNT_PERCENT_TEST,
       deliveryFeeKes: zone.feeKes,
     });
-  }, [items, zoneId]);
+  }, [items, zone.feeKes, getLinesForTotals]);
 
   const canPlace =
     items.length > 0 &&
@@ -86,7 +87,6 @@ export default function Checkout() {
       return;
     }
 
-    // ✅ Save order into ordersStore (stub persistence in memory)
     const order = addOrder({
       items: items.map((i) => ({
         name: i.name,
@@ -137,14 +137,16 @@ export default function Checkout() {
     );
   }
 
+  const payLabel = (paymentMethod ? paymentMethod.toUpperCase() : "PAY"); // ✅ avoids crash
+
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
-      <Text style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
+      <TText style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
         Checkout
-      </Text>
-      <Text style={{ color: "#444", marginBottom: 12 }}>
+      </TText>
+      <TText muted style={{ marginBottom: 12 }}>
         Choose a delivery zone, add your details, then pay.
-      </Text>
+      </TText>
 
       {/* Delivery zone */}
       <SectionTitle icon="navigate" title="Delivery zone" />
@@ -171,23 +173,25 @@ export default function Checkout() {
                   }}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text
+                    <TText
                       style={{
                         fontWeight: "900",
                         fontSize: 16,
-                        color: active ? "#fff" : "#111827",
+                        color: active ? "#fff" : undefined, // keep your design
                       }}
                     >
                       {z.title} • {z.rangeLabel}
-                    </Text>
-                    <Text
+                    </TText>
+
+                    <TText
                       style={{
                         marginTop: 4,
-                        color: active ? "rgba(255,255,255,0.9)" : "#444",
+                        color: active ? "rgba(255,255,255,0.9)" : undefined,
                       }}
+                      muted={!active}
                     >
                       {z.note}
-                    </Text>
+                    </TText>
                   </View>
 
                   <View
@@ -204,14 +208,14 @@ export default function Checkout() {
                         : "#E7EBFF",
                     }}
                   >
-                    <Text
+                    <TText
                       style={{
                         fontWeight: "900",
-                        color: active ? "#fff" : "#111827",
+                        color: active ? "#fff" : undefined,
                       }}
                     >
                       KES {z.feeKes}
-                    </Text>
+                    </TText>
                   </View>
                 </View>
               </View>
@@ -283,9 +287,7 @@ export default function Checkout() {
           value={`- KES ${totals.discountKes}`}
         />
         <Row label="Delivery fee" value={`KES ${totals.deliveryFeeKes}`} />
-        <View
-          style={{ height: 1, backgroundColor: "#EEF1FF", marginVertical: 6 }}
-        />
+        <View style={{ height: 1, backgroundColor: "#EEF1FF", marginVertical: 6 }} />
         <Row label="Total" value={`KES ${totals.totalKes}`} strong />
       </View>
 
@@ -309,12 +311,12 @@ export default function Checkout() {
           }}
         >
           <View>
-            <Text style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
+            <TText style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
               Place order
-            </Text>
-            <Text style={{ color: "rgba(255,255,255,0.95)", marginTop: 2 }}>
-              Pay {paymentMethod.toUpperCase()} • KES {totals.totalKes}
-            </Text>
+            </TText>
+            <TText style={{ color: "rgba(255,255,255,0.95)", marginTop: 2 }}>
+              Pay {payLabel} • KES {totals.totalKes}
+            </TText>
           </View>
 
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -333,7 +335,7 @@ function SectionTitle({ icon, title }) {
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
       <Ionicons name={icon} size={18} color="#111827" />
-      <Text style={{ fontSize: 16, fontWeight: "900" }}>{title}</Text>
+      <TText style={{ fontSize: 16, fontWeight: "900" }}>{title}</TText>
     </View>
   );
 }
@@ -348,7 +350,7 @@ function Field({
 }) {
   return (
     <View>
-      <Text style={{ fontWeight: "900", marginBottom: 6 }}>{label}</Text>
+      <TText style={{ fontWeight: "900", marginBottom: 6 }}>{label}</TText>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -383,18 +385,18 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
         }}
       >
         <Ionicons name={icon} size={18} color={active ? "#fff" : "#111827"} />
-        <Text
+        <TText
           style={{
             fontWeight: "900",
             fontSize: 16,
-            color: active ? "#fff" : "#111827",
+            color: active ? "#fff" : undefined,
           }}
         >
           {title}
-        </Text>
-        <Text style={{ color: active ? "rgba(255,255,255,0.9)" : "#444" }}>
+        </TText>
+        <TText style={{ color: active ? "rgba(255,255,255,0.9)" : undefined }} muted={!active}>
           {subtitle}
-        </Text>
+        </TText>
       </View>
     </ScalePress>
   );
@@ -402,17 +404,11 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
 
 function Row({ label, value, strong }) {
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
-    >
-      <Text style={{ color: "#444", fontWeight: strong ? "900" : "700" }}>
+    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+      <TText muted style={{ fontWeight: strong ? "900" : "700" }}>
         {label}
-      </Text>
-      <Text style={{ fontWeight: strong ? "900" : "800" }}>{value}</Text>
+      </TText>
+      <TText style={{ fontWeight: strong ? "900" : "800" }}>{value}</TText>
     </View>
   );
 }
