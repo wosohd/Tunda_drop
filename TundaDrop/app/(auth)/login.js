@@ -45,7 +45,8 @@ export default function Login() {
     try {
       setBusy(true);
       await login({ email, password });
-      router.replace("/(shop)/categories");
+      // ✅ go Home so header becomes "Sign out"
+      router.replace("/");
     } catch (e) {
       Alert.alert("Login failed", e?.message ?? "Try again.");
     } finally {
@@ -65,7 +66,8 @@ export default function Login() {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ padding: 16, paddingTop: 18 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 18, flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
         >
           <Animated.View style={{ transform: [{ translateY: floatY }] }}>
@@ -107,7 +109,13 @@ export default function Login() {
             />
             <LinearGradient
               colors={["rgba(0,0,0,0.05)", "rgba(0,0,0,0.35)"]}
-              style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: 12 }}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                padding: 12,
+              }}
             >
               <Text style={{ color: "#fff", fontWeight: "900" }}>
                 Fresh • Fast • Futuristic
@@ -170,8 +178,10 @@ export default function Login() {
               </LinearGradient>
             </Pressable>
 
-            {/* ✅ NEW: Continue as guest */}
-            <Pressable onPress={() => router.replace("/(shop)/categories")} disabled={busy}>
+            <Pressable
+              onPress={() => router.replace("/(shop)/categories")}
+              disabled={busy}
+            >
               <View
                 style={{
                   borderRadius: 22,
@@ -214,7 +224,15 @@ export default function Login() {
   );
 }
 
-function Field({ label, icon, value, onChangeText, placeholder, keyboardType, secureTextEntry }) {
+function Field({
+  label,
+  icon,
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  secureTextEntry,
+}) {
   return (
     <View style={{ gap: 6 }}>
       <Text style={{ color: "#fff", fontWeight: "950" }}>{label}</Text>

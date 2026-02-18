@@ -5,7 +5,6 @@ import { useRouter } from "expo-router";
 import { useOrdersStore } from "../../src/store/ordersStore";
 
 import { useThemeTokens } from "../../src/theme/useTheme";
-import { QuickBar } from "../../src/components/ui/QuickBar";
 
 function formatDate(iso) {
   try {
@@ -77,9 +76,6 @@ export default function Orders() {
             </Text>
           </Pressable>
         </View>
-
-        {/* ✅ Bottom-left horizontal bar with Theme + Logout */}
-        <QuickBar />
       </View>
     );
   }
@@ -88,7 +84,7 @@ export default function Orders() {
     <View style={{ flex: 1, backgroundColor: t.bg }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 24 }}
       >
         <View
           style={{
@@ -138,10 +134,7 @@ export default function Orders() {
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text
-                    style={{ fontWeight: "900", color: t.text }}
-                    numberOfLines={1}
-                  >
+                  <Text style={{ fontWeight: "900", color: t.text }} numberOfLines={1}>
                     {o.id}
                   </Text>
                   <Text style={{ color: t.mutedText, marginTop: 2 }}>
@@ -179,9 +172,7 @@ export default function Orders() {
           ))}
         </View>
       </ScrollView>
-
-      {/* ✅ Bottom-left horizontal bar with Theme + Logout */}
-      <QuickBar />
     </View>
   );
 }
+

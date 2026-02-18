@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useEffect } from "react";
 import {
   View,
   ScrollView,
@@ -15,18 +15,20 @@ import { useCheckoutStore } from "../../src/store/checkoutStore";
 import { useCartStore } from "../../src/store/cartStore";
 import { useOrdersStore } from "../../src/store/ordersStore";
 import { calcTotalsKes } from "../../src/lib/money";
-
 import { TText } from "../../src/components/ui/TText";
+import { useAuthStore } from "../../src/store/authStore";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
-function ScalePress({ children, onPress, style }) {
+// ✅ Fix 1: ScalePress accepts + applies style so children can layout (flex: 1, etc.)
+function ScalePress({ children, onPress, style, disabled }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   return (
     <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <Pressable
         onPress={onPress}
+        disabled={disabled}
         onPressIn={() =>
           Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()
         }
@@ -42,6 +44,14 @@ function ScalePress({ children, onPress, style }) {
 
 export default function Checkout() {
   const router = useRouter();
+
+  const user = useAuthStore((s) => s.user);
+  const isAuthHydrating = useAuthStore((s) => s.isHydrating);
+
+  useEffect(() => {
+    if (isAuthHydrating) return;
+    if (!user) router.replace("/(auth)/login");
+  }, [isAuthHydrating, user]);
 
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clear);
@@ -79,6 +89,13 @@ export default function Checkout() {
     !!paymentMethod;
 
   function placeOrderStub() {
+    if (!user) {
+      Alert.alert("Sign in required", "Please sign in to place an order.", [
+        { text: "Go to login", onPress: () => router.replace("/(auth)/login") },
+      ]);
+      return;
+    }
+
     if (!canPlace) {
       Alert.alert(
         "Missing info",
@@ -88,6 +105,7 @@ export default function Checkout() {
     }
 
     const order = addOrder({
+      userId: user.id,
       items: items.map((i) => ({
         name: i.name,
         sizeLabel: i.sizeLabel,
@@ -137,10 +155,14 @@ export default function Checkout() {
     );
   }
 
-  const payLabel = (paymentMethod ? paymentMethod.toUpperCase() : "PAY"); // ✅ avoids crash
+  const payLabel = paymentMethod ? paymentMethod.toUpperCase() : "PAY";
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      // ✅ Fix 2: avoids "blank" layouts + ensures screen fills and scrolls nicely
+      contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+    >
       <TText style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
         Checkout
       </TText>
@@ -177,7 +199,7 @@ export default function Checkout() {
                       style={{
                         fontWeight: "900",
                         fontSize: 16,
-                        color: active ? "#fff" : undefined, // keep your design
+                        color: active ? "#fff" : undefined,
                       }}
                     >
                       {z.title} • {z.rangeLabel}
@@ -227,7 +249,6 @@ export default function Checkout() {
       {/* Address + Phone */}
       <View style={{ height: 14 }} />
       <SectionTitle icon="home" title="Delivery details" />
-
       <View style={{ gap: 10, marginTop: 10 }}>
         <Field
           label="Delivery address"
@@ -248,7 +269,6 @@ export default function Checkout() {
       {/* Payment method */}
       <View style={{ height: 14 }} />
       <SectionTitle icon="wallet" title="Payment method" />
-
       <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
         <PayChoice
           active={paymentMethod === "mpesa"}
@@ -269,7 +289,6 @@ export default function Checkout() {
       {/* Summary */}
       <View style={{ height: 14 }} />
       <SectionTitle icon="receipt" title="Summary" />
-
       <View
         style={{
           marginTop: 10,
@@ -294,7 +313,7 @@ export default function Checkout() {
       {/* Place order */}
       <View style={{ height: 14 }} />
 
-      <ScalePress onPress={placeOrderStub}>
+      <ScalePress onPress={placeOrderStub} disabled={!canPlace}>
         <LinearGradient
           colors={
             canPlace
@@ -394,7 +413,10 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
         >
           {title}
         </TText>
-        <TText style={{ color: active ? "rgba(255,255,255,0.9)" : undefined }} muted={!active}>
+        <TText
+          style={{ color: active ? "rgba(255,255,255,0.9)" : undefined }}
+          muted={!active}
+        >
           {subtitle}
         </TText>
       </View>
@@ -404,7 +426,13 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
 
 function Row({ label, value, strong }) {
   return (
-    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}
+    >
       <TText muted style={{ fontWeight: strong ? "900" : "700" }}>
         {label}
       </TText>
@@ -412,3 +440,6 @@ function Row({ label, value, strong }) {
     </View>
   );
 }
+
+
+

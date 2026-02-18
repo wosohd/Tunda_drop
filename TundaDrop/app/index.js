@@ -14,7 +14,6 @@ import { useRouter } from "expo-router";
 import { CATEGORIES, PRODUCTS } from "../src/constants/mockData";
 
 import { useThemeTokens } from "../src/theme/useTheme";
-import { QuickBar } from "../src/components/ui/QuickBar";
 
 function ScalePress({ children, onPress, style }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -70,7 +69,6 @@ export default function Home() {
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 110 }}
       >
-        {/* Hero (keep vibrant gradient) */}
         <LinearGradient
           colors={["#00D1FF", "#7C4DFF", "#FF3D81"]}
           start={{ x: 0, y: 0 }}
@@ -123,7 +121,6 @@ export default function Home() {
             </ScalePress>
           </View>
 
-          {/* Search */}
           <View
             style={{
               marginTop: 14,
@@ -157,55 +154,6 @@ export default function Home() {
             )}
           </View>
 
-          {/* Search results */}
-          {showResults && (
-            <View
-              style={{
-                marginTop: 10,
-                borderRadius: 18,
-                backgroundColor: "rgba(17,24,39,0.30)",
-                borderWidth: 1,
-                borderColor: "rgba(255,255,255,0.22)",
-                overflow: "hidden",
-              }}
-            >
-              {results.length === 0 ? (
-                <View style={{ padding: 12 }}>
-                  <Text style={{ color: "#fff", fontWeight: "900" }}>No matches</Text>
-                  <Text style={{ color: "rgba(255,255,255,0.9)", marginTop: 4 }}>
-                    Try “mango”, “cocktail”, “pulpy”, “detox”.
-                  </Text>
-                </View>
-              ) : (
-                results.map((p, idx) => (
-                  <Pressable
-                    key={p.id}
-                    onPress={() => router.push(`/(shop)/product/${p.id}`)}
-                    style={{
-                      padding: 12,
-                      borderTopWidth: idx === 0 ? 0 : 1,
-                      borderTopColor: "rgba(255,255,255,0.12)",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      gap: 10,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: "#fff", fontWeight: "900" }} numberOfLines={1}>
-                        {p.name}
-                      </Text>
-                      <Text style={{ color: "rgba(255,255,255,0.9)", marginTop: 2 }}>
-                        From KES {p.variants?.[0]?.price ?? "-"}
-                      </Text>
-                    </View>
-                    <Ionicons name="chevron-forward" size={18} color="#fff" />
-                  </Pressable>
-                ))
-              )}
-            </View>
-          )}
-
           <View style={{ marginTop: 14, flexDirection: "row", gap: 10 }}>
             <ScalePress onPress={() => router.push("/(shop)/categories")}>
               <View
@@ -224,28 +172,9 @@ export default function Home() {
                 </Text>
               </View>
             </ScalePress>
-
-            <ScalePress onPress={() => router.push("/(auth)/login")}>
-              <View
-                style={{
-                  width: 120,
-                  borderRadius: 18,
-                  backgroundColor: "rgba(255,255,255,0.22)",
-                  padding: 14,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Ionicons name="person" size={18} color="#fff" />
-                <Text style={{ color: "#fff", fontWeight: "800", marginTop: 6 }}>
-                  Login
-                </Text>
-              </View>
-            </ScalePress>
           </View>
         </LinearGradient>
 
-        {/* Category chips (theme-safe) */}
         <Text style={{ fontSize: 18, fontWeight: "800", marginBottom: 8, color: t.text }}>
           Categories
         </Text>
@@ -275,25 +204,6 @@ export default function Home() {
           </View>
         </ScrollView>
 
-        {/* Featured header (theme-safe) */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            marginTop: 6,
-            marginBottom: 10,
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: "800", color: t.text }}>
-            Featured
-          </Text>
-          <Pressable onPress={() => router.push("/(shop)/categories")}>
-            <Text style={{ fontWeight: "800", color: t.text }}>See all</Text>
-          </Pressable>
-        </View>
-
-        {/* Featured cards (theme-safe) */}
         <View style={{ gap: 12 }}>
           {featured.map((p) => (
             <ScalePress key={p.id} onPress={() => router.push(`/(shop)/product/${p.id}`)}>
@@ -348,9 +258,6 @@ export default function Home() {
           ))}
         </View>
       </ScrollView>
-
-      {/* ✅ Bottom-left horizontal bar with Theme + Logout */}
-      <QuickBar />
     </View>
   );
 }

@@ -5,9 +5,7 @@ import { useRouter } from "expo-router";
 
 import { useCartStore } from "../../src/store/cartStore";
 import { calcTotalsKes } from "../../src/lib/money";
-
-import { useTheme } from "../../src/theme/useTheme"; // <-- adjust if needed
-import QuickBar from "../../src/components/ui/QuickBar"; // <-- adjust if needed
+import { useThemeTokens } from "../../src/theme/useTheme";
 
 import Card from "../../src/components/ui/card";
 import ScalePress from "../../src/components/ui/ScalePress";
@@ -16,7 +14,7 @@ import GradientButton from "../../src/components/ui/GradientButton";
 
 export default function Cart() {
   const router = useRouter();
-  const { t } = useTheme();
+  const t = useThemeTokens();
 
   const items = useCartStore((s) => s.items);
   const inc = useCartStore((s) => s.inc);
@@ -27,30 +25,26 @@ export default function Cart() {
 
   const styles = useMemo(() => makeStyles(t), [t]);
 
-  // Testing discount (10%) and delivery fee (0 here; added in Checkout)
   const totals = useMemo(() => {
     return calcTotalsKes({
       lines: getLinesForTotals(),
       discountPercent: 10,
       deliveryFeeKes: 0,
     });
-    // items triggers recompute when qty changes (and your store updates items array)
   }, [items, getLinesForTotals]);
 
   if (items.length === 0) {
     return (
       <View style={styles.screen}>
-        <QuickBar title="Cart" />
-
         <View style={styles.emptyWrap}>
-          <Ionicons name="cart-outline" size={44} color={t.colors.text} />
+          <Ionicons name="cart-outline" size={44} color={t.text} />
           <Text style={styles.emptyTitle}>Your cart is empty</Text>
           <Text style={styles.emptySub}>Add a juice and come back here.</Text>
 
           <GradientButton
             title="Browse juices"
             onPress={() => router.push("/(shop)/categories")}
-            style={{ marginTop: t.space.md, alignSelf: "stretch" }}
+            style={{ marginTop: 12, alignSelf: "stretch" }}
             right={<Ionicons name="chevron-forward" size={18} color="#fff" />}
           />
         </View>
@@ -60,13 +54,7 @@ export default function Cart() {
 
   return (
     <View style={styles.screen}>
-      <QuickBar title="Cart" />
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: t.space.xl }}
-      >
-        {/* Header actions */}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
         <View style={styles.headerRow}>
           <Text style={styles.hTitle}>Your Cart</Text>
           <Pressable onPress={clear} hitSlop={10}>
@@ -74,8 +62,7 @@ export default function Cart() {
           </Pressable>
         </View>
 
-        {/* Cart items */}
-        <View style={{ gap: t.space.md, marginTop: t.space.md }}>
+        <View style={{ gap: 12, marginTop: 12 }}>
           {items.map((i) => (
             <Card key={i.key}>
               <View style={styles.itemRow}>
@@ -93,15 +80,14 @@ export default function Cart() {
                     </View>
 
                     <Pressable onPress={() => remove(i.key)} hitSlop={10}>
-                      <Ionicons name="trash" size={18} color={t.colors.text} />
+                      <Ionicons name="trash" size={18} color={t.text} />
                     </Pressable>
                   </View>
 
-                  {/* Qty controls */}
                   <View style={styles.qtyRow}>
                     <ScalePress onPress={() => dec(i.key)} disabled={i.quantity <= 1}>
                       <View style={styles.iconBtn}>
-                        <Ionicons name="remove" size={16} color={t.colors.text} />
+                        <Ionicons name="remove" size={16} color={t.text} />
                       </View>
                     </ScalePress>
 
@@ -111,7 +97,7 @@ export default function Cart() {
 
                     <ScalePress onPress={() => inc(i.key)}>
                       <View style={styles.iconBtn}>
-                        <Ionicons name="add" size={16} color={t.colors.text} />
+                        <Ionicons name="add" size={16} color={t.text} />
                       </View>
                     </ScalePress>
 
@@ -125,23 +111,15 @@ export default function Cart() {
           ))}
         </View>
 
-        {/* Totals */}
-        <Card style={{ marginTop: t.space.lg, padding: t.space.md, gap: t.space.sm }}>
+        <Card style={{ marginTop: 16, padding: 14, gap: 8 }}>
           <SummaryRow label="Subtotal" value={`KES ${totals.subtotalKes}`} />
           <SummaryRow label="Discount (10% test)" value={`- KES ${totals.discountKes}`} />
           <SummaryRow label="Delivery" value="Select at checkout" />
-
           <View style={styles.divider} />
-
-          <SummaryRow
-            label="Total (excl. delivery)"
-            value={`KES ${totals.discountedSubtotalKes}`}
-            strong
-          />
+          <SummaryRow label="Total (excl. delivery)" value={`KES ${totals.discountedSubtotalKes}`} strong />
         </Card>
 
-        {/* Checkout CTA */}
-        <View style={{ height: t.space.md }} />
+        <View style={{ height: 12 }} />
 
         <GradientButton
           title="Continue to checkout"
@@ -163,46 +141,45 @@ function makeStyles(t) {
   return StyleSheet.create({
     screen: {
       flex: 1,
-      backgroundColor: t.colors.bg,
-      paddingHorizontal: t.space.md,
+      backgroundColor: t.bg,
+      paddingHorizontal: 16,
     },
-
     headerRow: {
       flexDirection: "row",
       justifyContent: "space-between",
       alignItems: "center",
-      marginTop: t.space.sm,
+      marginTop: 8,
     },
-    hTitle: { color: t.colors.text, fontSize: 20, fontWeight: "900" },
-    clearText: { color: t.colors.text, fontWeight: "900" },
+    hTitle: { color: t.text, fontSize: 20, fontWeight: "900" },
+    clearText: { color: t.text, fontWeight: "900" },
 
     emptyWrap: {
       flex: 1,
       justifyContent: "center",
       alignItems: "center",
-      gap: t.space.sm,
-      paddingBottom: t.space.xl,
+      gap: 10,
+      paddingBottom: 24,
     },
-    emptyTitle: { color: t.colors.text, fontSize: 18, fontWeight: "900" },
-    emptySub: { color: t.colors.muted, textAlign: "center" },
+    emptyTitle: { color: t.text, fontSize: 18, fontWeight: "900" },
+    emptySub: { color: t.mutedText, textAlign: "center" },
 
     itemRow: { flexDirection: "row" },
-    itemImage: { width: 110, height: 110, backgroundColor: t.colors.soft },
-    itemBody: { flex: 1, padding: t.space.md, gap: t.space.sm },
+    itemImage: { width: 110, height: 110, backgroundColor: t.chipBg },
+    itemBody: { flex: 1, padding: 14, gap: 10 },
 
-    itemTop: { flexDirection: "row", alignItems: "flex-start", gap: t.space.sm },
-    itemName: { color: t.colors.text, fontWeight: "900", fontSize: 16 },
-    itemMeta: { color: t.colors.muted, marginTop: 2 },
+    itemTop: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
+    itemName: { color: t.text, fontWeight: "900", fontSize: 16 },
+    itemMeta: { color: t.mutedText, marginTop: 2 },
 
-    qtyRow: { flexDirection: "row", alignItems: "center", gap: t.space.sm },
+    qtyRow: { flexDirection: "row", alignItems: "center", gap: 10 },
 
     iconBtn: {
       width: 42,
       height: 42,
-      borderRadius: t.radii.lg,
-      backgroundColor: t.colors.soft,
+      borderRadius: 18,
+      backgroundColor: t.chipBg,
       borderWidth: 1,
-      borderColor: t.colors.borderSoft,
+      borderColor: t.chipBorder,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -210,20 +187,20 @@ function makeStyles(t) {
     qtyPill: {
       minWidth: 54,
       height: 42,
-      borderRadius: t.radii.lg,
-      backgroundColor: t.colors.text, // dark pill
+      borderRadius: 18,
+      backgroundColor: t.text,
       alignItems: "center",
       justifyContent: "center",
-      paddingHorizontal: t.space.sm,
+      paddingHorizontal: 10,
     },
-    qtyText: { color: t.colors.bg, fontWeight: "900" },
+    qtyText: { color: t.bg, fontWeight: "900" },
 
-    lineTotal: { color: t.colors.text, fontWeight: "900" },
+    lineTotal: { color: t.text, fontWeight: "900" },
 
     divider: {
       height: 1,
-      backgroundColor: t.colors.border,
-      marginVertical: t.space.sm,
+      backgroundColor: t.border,
+      marginVertical: 8,
     },
   });
 }

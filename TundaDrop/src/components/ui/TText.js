@@ -1,6 +1,6 @@
 import React from "react";
 import { Text } from "react-native";
-import { useThemeTokens } from "../theme/useTheme";
+import { useThemeTokens } from "../../theme/useTheme";
 
 export function TText({ children, style, muted, bold, center, ...props }) {
   const t = useThemeTokens();

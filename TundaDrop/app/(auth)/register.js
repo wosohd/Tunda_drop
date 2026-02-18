@@ -24,6 +24,7 @@ export default function Register() {
   const [busy, setBusy] = useState(false);
 
   const glow = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
@@ -45,7 +46,6 @@ export default function Register() {
       setBusy(true);
       const data = await register({ email, password });
 
-      // If email confirmation is ON, user may need to confirm before session exists.
       Alert.alert(
         "Account created",
         data?.session
@@ -53,7 +53,8 @@ export default function Register() {
           : "Check your email to confirm your account, then login."
       );
 
-      router.replace(data?.session ? "/(shop)/categories" : "/(auth)/login");
+      // Go Home so header becomes Sign out
+      router.replace(data?.session ? "/" : "/(auth)/login");
     } catch (e) {
       Alert.alert("Sign up failed", e?.message ?? "Try again.");
     } finally {
@@ -63,8 +64,15 @@ export default function Register() {
 
   return (
     <LinearGradient colors={["#0B1220", "#7C4DFF", "#00D1FF"]} style={{ flex: 1 }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1 }}>
-        <ScrollView contentContainerStyle={{ padding: 16, paddingTop: 18 }} keyboardShouldPersistTaps="handled">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ padding: 16, paddingTop: 18, flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
           <Pressable onPress={() => router.back()} style={{ alignSelf: "flex-start" }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="chevron-back" size={20} color="#fff" />
@@ -74,7 +82,9 @@ export default function Register() {
 
           <View style={{ height: 14 }} />
 
-          <Text style={{ color: "#fff", fontSize: 28, fontWeight: "950" }}>Create your account ✨</Text>
+          <Text style={{ color: "#fff", fontSize: 28, fontWeight: "950" }}>
+            Create your account ✨
+          </Text>
           <Text style={{ color: "rgba(255,255,255,0.90)", marginTop: 6 }}>
             Get faster checkout, order tracking, and future loyalty rewards.
           </Text>
@@ -92,23 +102,22 @@ export default function Register() {
                 gap: 10,
               }}
             >
-              <Field label="Email" icon="mail" value={email} onChangeText={setEmail} placeholder="name@email.com" keyboardType="email-address" />
-              <Field label="Password" icon="lock-closed" value={password} onChangeText={setPassword} placeholder="min 6 characters" secureTextEntry />
-
-              <View
-                style={{
-                  borderRadius: 18,
-                  padding: 12,
-                  backgroundColor: "rgba(255,255,255,0.12)",
-                  borderWidth: 1,
-                  borderColor: "rgba(255,255,255,0.18)",
-                }}
-              >
-                <Text style={{ color: "#fff", fontWeight: "900" }}>🔥 Early adopter perks (later)</Text>
-                <Text style={{ color: "rgba(255,255,255,0.88)", marginTop: 4 }}>
-                  Discounts, priority delivery, and seasonal drops.
-                </Text>
-              </View>
+              <Field
+                label="Email"
+                icon="mail"
+                value={email}
+                onChangeText={setEmail}
+                placeholder="name@email.com"
+                keyboardType="email-address"
+              />
+              <Field
+                label="Password"
+                icon="lock-closed"
+                value={password}
+                onChangeText={setPassword}
+                placeholder="min 6 characters"
+                secureTextEntry
+              />
 
               <Pressable onPress={onCreate} disabled={busy}>
                 <LinearGradient
@@ -133,7 +142,14 @@ export default function Register() {
               </Pressable>
 
               <Pressable onPress={() => router.replace("/(auth)/login")}>
-                <Text style={{ color: "#fff", fontWeight: "900", textAlign: "center", marginTop: 4 }}>
+                <Text
+                  style={{
+                    color: "#fff",
+                    fontWeight: "900",
+                    textAlign: "center",
+                    marginTop: 4,
+                  }}
+                >
                   Already have an account? Login →
                 </Text>
               </Pressable>
@@ -179,3 +195,7 @@ function Field({ label, icon, value, onChangeText, placeholder, keyboardType, se
     </View>
   );
 }
+
+          
+
+

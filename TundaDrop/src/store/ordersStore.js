@@ -8,6 +8,10 @@ export const useOrdersStore = create((set, get) => ({
   orders: [], // newest first
 
   addOrder: (order) => {
+    if (!order?.userId) {
+      throw new Error("Cannot create order without userId");
+    }
+
     const id = makeId();
     const createdAt = new Date().toISOString();
 
@@ -26,7 +30,6 @@ export const useOrdersStore = create((set, get) => ({
 
   clearOrders: () => set({ orders: [] }),
 
-  // Optional: update status later (admin/rider flow)
   updateStatus: (id, status) =>
     set((state) => ({
       orders: state.orders.map((o) => (o.id === id ? { ...o, status } : o)),

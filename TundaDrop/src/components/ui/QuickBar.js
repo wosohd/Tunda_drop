@@ -3,13 +3,13 @@ import { View, Pressable, Text } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-import { useThemeStore } from "../store/themeStore";
-import { useThemeTokens } from "../theme/useTheme";
+import { useThemeStore } from "../../store/themeStore";
+import { useThemeTokens } from "../../theme/useTheme";
 
-import { useAuthStore } from "../store/authStore";
-import { useCartStore } from "../store/cartStore";
-import { useCheckoutStore } from "../store/checkoutStore";
-import { useOrdersStore } from "../store/ordersStore";
+import { useAuthStore } from "../../store/authStore";
+import { useCartStore } from "../../store/cartStore";
+import { useCheckoutStore } from "../../store/checkoutStore";
+import { useOrdersStore } from "../../store/ordersStore";
 
 export function QuickBar() {
   const router = useRouter();
