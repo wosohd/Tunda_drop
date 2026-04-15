@@ -2,7 +2,6 @@
   "expo": {
     "name": "TundaDrop",
     "slug": "TundaDrop",
-    "plugins": "expo-router",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

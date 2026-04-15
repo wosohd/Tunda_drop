@@ -1,0 +1,7 @@
+project_id = "your-project-id"
+
+[functions.initiate-mpesa-stk]
+verify_jwt = true
+
+[functions.mpesa-callback]
+verify_jwt = false

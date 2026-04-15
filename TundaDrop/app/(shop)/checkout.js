@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import {
   View,
   ScrollView,
@@ -10,31 +10,38 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+
 import { DELIVERY_ZONES } from "../../src/constants/deliveryZones";
 import { useCheckoutStore } from "../../src/store/checkoutStore";
 import { useCartStore } from "../../src/store/cartStore";
-import { useOrdersStore } from "../../src/store/ordersStore";
 import { calcTotalsKes } from "../../src/lib/money";
 import { TText } from "../../src/components/ui/TText";
 import { useAuthStore } from "../../src/store/authStore";
+import { createOrder } from "../../src/lib/orders/createOrder";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
-// ✅ Fix 1: ScalePress accepts + applies style so children can layout (flex: 1, etc.)
 function ScalePress({ children, onPress, style, disabled }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   return (
     <Animated.View style={[{ transform: [{ scale }] }, style]}>
       <Pressable
-        onPress={onPress}
         disabled={disabled}
         onPressIn={() =>
-          Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()
+          Animated.spring(scale, {
+            toValue: 0.97,
+            useNativeDriver: true,
+          }).start()
         }
         onPressOut={() =>
-          Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()
+          Animated.spring(scale, {
+            toValue: 1,
+            useNativeDriver: true,
+          }).start()
         }
+        onPress={onPress}
+        style={{ flex: 1, opacity: disabled ? 0.65 : 1 }}
       >
         {children}
       </Pressable>
@@ -44,6 +51,7 @@ function ScalePress({ children, onPress, style, disabled }) {
 
 export default function Checkout() {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const user = useAuthStore((s) => s.user);
   const isAuthHydrating = useAuthStore((s) => s.isHydrating);
@@ -51,13 +59,11 @@ export default function Checkout() {
   useEffect(() => {
     if (isAuthHydrating) return;
     if (!user) router.replace("/(auth)/login");
-  }, [isAuthHydrating, user]);
+  }, [isAuthHydrating, user, router]);
 
   const items = useCartStore((s) => s.items);
   const clearCart = useCartStore((s) => s.clear);
   const getLinesForTotals = useCartStore((s) => s.getLinesForTotals);
-
-  const addOrder = useOrdersStore((s) => s.addOrder);
 
   const zoneId = useCheckoutStore((s) => s.zoneId);
   const address = useCheckoutStore((s) => s.address);
@@ -86,12 +92,16 @@ export default function Checkout() {
     items.length > 0 &&
     address.trim().length >= 6 &&
     phone.trim().length >= 9 &&
-    !!paymentMethod;
+    !!paymentMethod &&
+    !isSubmitting;
 
-  function placeOrderStub() {
+  async function handleCreateOrder() {
     if (!user) {
       Alert.alert("Sign in required", "Please sign in to place an order.", [
-        { text: "Go to login", onPress: () => router.replace("/(auth)/login") },
+        {
+          text: "Go to login",
+          onPress: () => router.replace("/(auth)/login"),
+        },
       ]);
       return;
     }
@@ -104,257 +114,199 @@ export default function Checkout() {
       return;
     }
 
-    const order = addOrder({
-      userId: user.id,
-      items: items.map((i) => ({
-        name: i.name,
-        sizeLabel: i.sizeLabel,
-        unitPriceKes: i.unitPriceKes,
-        quantity: i.quantity,
-        image: i.image,
-      })),
-      delivery: {
-        zoneId: zone.id,
-        zoneTitle: zone.title,
-        rangeLabel: zone.rangeLabel,
-        feeKes: zone.feeKes,
-        address: address.trim(),
-        phone: phone.trim(),
-      },
-      payment: {
-        method: paymentMethod, // "mpesa" | "card"
-      },
-      pricing: {
-        discountPercent: DISCOUNT_PERCENT_TEST,
-        subtotalKes: totals.subtotalKes,
-        discountKes: totals.discountKes,
-        deliveryFeeKes: totals.deliveryFeeKes,
-        totalKes: totals.totalKes,
-      },
-    });
+    try {
+      setIsSubmitting(true);
 
-    Alert.alert(
-      "Order placed (stub)",
-      `Order ID: ${order.id}\nPayment: ${paymentMethod.toUpperCase()}\nTotal: KES ${totals.totalKes}\nDelivery: ${zone.title} (${zone.rangeLabel})`,
-      [
-        {
-          text: "View order",
-          onPress: () => {
-            clearCart();
-            router.replace(`/(orders)/order/${order.id}`);
+      const { order } = await createOrder({
+        user,
+        items,
+        zoneId,
+        address,
+        phone,
+        paymentMethod,
+      });
+
+      Alert.alert(
+        "Order created",
+        `Order ${order.order_number ?? order.id} has been saved successfully.\n\nNext: ${paymentMethod.toUpperCase()} payment.`,
+        [
+          {
+            text: "Continue",
+            onPress: () => {
+              clearCart();
+
+              // For Step 2, go to the order page first.
+              // In Step 3/4, this can route into M-Pesa or Stripe initiation.
+              router.replace(`/(orders)/order/${order.id}`);
+            },
           },
-        },
-        {
-          text: "OK",
-          onPress: () => {
-            clearCart();
-            router.replace("/(orders)/orders");
-          },
-        },
-      ]
-    );
+        ]
+      );
+    } catch (error) {
+      Alert.alert(
+        "Could not create order",
+        error?.message || "Something went wrong while saving your order."
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   const payLabel = paymentMethod ? paymentMethod.toUpperCase() : "PAY";
 
   return (
-    <ScrollView
-      showsVerticalScrollIndicator={false}
-      // ✅ Fix 2: avoids "blank" layouts + ensures screen fills and scrolls nicely
-      contentContainerStyle={{ paddingBottom: 24, flexGrow: 1 }}
+    <LinearGradient
+      colors={["#F7FBF8", "#EEF8F2", "#FDFDFD"]}
+      style={{ flex: 1 }}
     >
-      <TText style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
-        Checkout
-      </TText>
-      <TText muted style={{ marginBottom: 12 }}>
-        Choose a delivery zone, add your details, then pay.
-      </TText>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 36 }}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={{ marginTop: 26, marginBottom: 18 }}>
+          <TText weight="bold" style={{ fontSize: 28, color: "#0F172A" }}>
+            Checkout
+          </TText>
+          <TText style={{ marginTop: 6, color: "#475569", lineHeight: 22 }}>
+            Choose a delivery zone, add your details, then pay.
+          </TText>
+        </View>
 
-      {/* Delivery zone */}
-      <SectionTitle icon="navigate" title="Delivery zone" />
-      <View style={{ gap: 10, marginTop: 10 }}>
-        {DELIVERY_ZONES.map((z) => {
-          const active = z.id === zoneId;
-          return (
-            <ScalePress key={z.id} onPress={() => setZoneId(z.id)}>
-              <View
-                style={{
-                  borderRadius: 22,
-                  padding: 14,
-                  borderWidth: 1,
-                  borderColor: active ? "#111827" : "#EEF1FF",
-                  backgroundColor: active ? "#111827" : "#fff",
-                }}
+        <SectionTitle icon="location-outline" title="Delivery zone" />
+        <View style={{ gap: 12, marginBottom: 18 }}>
+          {DELIVERY_ZONES.map((z) => {
+            const active = z.id === zoneId;
+            return (
+              <ScalePress
+                key={z.id}
+                onPress={() => setZoneId(z.id)}
+                style={{ borderRadius: 18 }}
               >
                 <View
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    gap: 10,
+                    borderRadius: 18,
+                    padding: 14,
+                    borderWidth: 1.2,
+                    borderColor: active ? "#22C55E" : "#D7E5DB",
+                    backgroundColor: active ? "#F0FDF4" : "#FFFFFF",
                   }}
                 >
-                  <View style={{ flex: 1 }}>
-                    <TText
-                      style={{
-                        fontWeight: "900",
-                        fontSize: 16,
-                        color: active ? "#fff" : undefined,
-                      }}
-                    >
-                      {z.title} • {z.rangeLabel}
-                    </TText>
-
-                    <TText
-                      style={{
-                        marginTop: 4,
-                        color: active ? "rgba(255,255,255,0.9)" : undefined,
-                      }}
-                      muted={!active}
-                    >
-                      {z.note}
-                    </TText>
-                  </View>
-
-                  <View
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 10,
-                      borderRadius: 16,
-                      backgroundColor: active
-                        ? "rgba(255,255,255,0.18)"
-                        : "#F4F6FF",
-                      borderWidth: 1,
-                      borderColor: active
-                        ? "rgba(255,255,255,0.25)"
-                        : "#E7EBFF",
-                    }}
+                  <TText weight="semibold" style={{ color: "#0F172A" }}>
+                    {z.title} • {z.rangeLabel}
+                  </TText>
+                  <TText style={{ color: "#64748B", marginTop: 4 }}>
+                    {z.note}
+                  </TText>
+                  <TText
+                    weight="bold"
+                    style={{ color: "#166534", marginTop: 8 }}
                   >
-                    <TText
-                      style={{
-                        fontWeight: "900",
-                        color: active ? "#fff" : undefined,
-                      }}
-                    >
-                      KES {z.feeKes}
-                    </TText>
-                  </View>
+                    KES {z.feeKes}
+                  </TText>
                 </View>
-              </View>
-            </ScalePress>
-          );
-        })}
-      </View>
+              </ScalePress>
+            );
+          })}
+        </View>
 
-      {/* Address + Phone */}
-      <View style={{ height: 14 }} />
-      <SectionTitle icon="home" title="Delivery details" />
-      <View style={{ gap: 10, marginTop: 10 }}>
-        <Field
-          label="Delivery address"
-          placeholder="e.g., Kilimani, Wood Avenue, Apt 12"
-          value={address}
-          onChangeText={setAddress}
-          multiline
-        />
-        <Field
-          label="Phone number"
-          placeholder="e.g., 07xx xxx xxx"
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-        />
-      </View>
+        <SectionTitle icon="home-outline" title="Delivery details" />
+        <View style={{ gap: 12, marginBottom: 18 }}>
+          <Field
+            label="Address"
+            value={address}
+            onChangeText={setAddress}
+            placeholder="Enter delivery address"
+            multiline
+          />
+          <Field
+            label="Phone number"
+            value={phone}
+            onChangeText={setPhone}
+            placeholder="e.g. 07XXXXXXXX"
+            keyboardType="phone-pad"
+          />
+        </View>
 
-      {/* Payment method */}
-      <View style={{ height: 14 }} />
-      <SectionTitle icon="wallet" title="Payment method" />
-      <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
-        <PayChoice
-          active={paymentMethod === "mpesa"}
-          title="M-Pesa"
-          subtitle="STK Push (later)"
-          icon="phone-portrait"
-          onPress={() => setPaymentMethod("mpesa")}
-        />
-        <PayChoice
-          active={paymentMethod === "card"}
-          title="Card"
-          subtitle="Visa/Mastercard (later)"
-          icon="card"
-          onPress={() => setPaymentMethod("card")}
-        />
-      </View>
+        <SectionTitle icon="card-outline" title="Payment method" />
+        <View style={{ gap: 12, marginBottom: 18 }}>
+          <PayChoice
+            active={paymentMethod === "mpesa"}
+            title="M-Pesa"
+            subtitle="Pay with STK Push or Till later"
+            icon="phone-portrait-outline"
+            onPress={() => setPaymentMethod("mpesa")}
+          />
+          <PayChoice
+            active={paymentMethod === "card"}
+            title="Card"
+            subtitle="Pay with Stripe"
+            icon="card-outline"
+            onPress={() => setPaymentMethod("card")}
+          />
+        </View>
 
-      {/* Summary */}
-      <View style={{ height: 14 }} />
-      <SectionTitle icon="receipt" title="Summary" />
-      <View
-        style={{
-          marginTop: 10,
-          borderRadius: 22,
-          borderWidth: 1,
-          borderColor: "#EEF1FF",
-          backgroundColor: "#fff",
-          padding: 14,
-          gap: 8,
-        }}
-      >
-        <Row label="Subtotal" value={`KES ${totals.subtotalKes}`} />
-        <Row
-          label={`Discount (${DISCOUNT_PERCENT_TEST}% test)`}
-          value={`- KES ${totals.discountKes}`}
-        />
-        <Row label="Delivery fee" value={`KES ${totals.deliveryFeeKes}`} />
-        <View style={{ height: 1, backgroundColor: "#EEF1FF", marginVertical: 6 }} />
-        <Row label="Total" value={`KES ${totals.totalKes}`} strong />
-      </View>
-
-      {/* Place order */}
-      <View style={{ height: 14 }} />
-
-      <ScalePress onPress={placeOrderStub} disabled={!canPlace}>
-        <LinearGradient
-          colors={
-            canPlace
-              ? ["#00D1FF", "#7C4DFF", "#FF3D81"]
-              : ["#C7CBD6", "#C7CBD6", "#C7CBD6"]
-          }
+        <SectionTitle icon="receipt-outline" title="Summary" />
+        <View
           style={{
-            borderRadius: 22,
-            paddingVertical: 14,
-            paddingHorizontal: 14,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
+            backgroundColor: "#FFFFFF",
+            borderRadius: 18,
+            padding: 14,
+            borderWidth: 1,
+            borderColor: "#E5E7EB",
+            marginBottom: 20,
+            gap: 10,
           }}
         >
-          <View>
-            <TText style={{ color: "#fff", fontWeight: "900", fontSize: 16 }}>
-              Place order
-            </TText>
-            <TText style={{ color: "rgba(255,255,255,0.95)", marginTop: 2 }}>
-              Pay {payLabel} • KES {totals.totalKes}
-            </TText>
-          </View>
+          <Row label="Subtotal" value={`KES ${totals.subtotalKes}`} />
+          <Row label="Discount" value={`- KES ${totals.discountKes}`} />
+          <Row label="Delivery" value={`KES ${totals.deliveryFeeKes}`} />
+          <View
+            style={{
+              height: 1,
+              backgroundColor: "#E5E7EB",
+              marginVertical: 4,
+            }}
+          />
+          <Row strong label="Total" value={`KES ${totals.totalKes}`} />
+        </View>
 
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Ionicons name="lock-closed" size={18} color="#fff" />
-            <Ionicons name="chevron-forward" size={18} color="#fff" />
-          </View>
-        </LinearGradient>
-      </ScalePress>
-
-      <View style={{ height: 28 }} />
-    </ScrollView>
+        <ScalePress onPress={handleCreateOrder} disabled={!canPlace}>
+          <LinearGradient
+            colors={["#16A34A", "#22C55E"]}
+            style={{
+              borderRadius: 18,
+              paddingVertical: 16,
+              paddingHorizontal: 16,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <TText weight="bold" style={{ color: "white", fontSize: 16 }}>
+              {isSubmitting
+                ? "Saving order..."
+                : `Pay ${payLabel} • KES ${totals.totalKes}`}
+            </TText>
+          </LinearGradient>
+        </ScalePress>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 function SectionTitle({ icon, title }) {
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-      <Ionicons name={icon} size={18} color="#111827" />
-      <TText style={{ fontSize: 16, fontWeight: "900" }}>{title}</TText>
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        marginBottom: 10,
+      }}
+    >
+      <Ionicons name={icon} size={18} color="#166534" />
+      <TText weight="bold" style={{ fontSize: 16, color: "#0F172A" }}>
+        {title}
+      </TText>
     </View>
   );
 }
@@ -369,7 +321,12 @@ function Field({
 }) {
   return (
     <View>
-      <TText style={{ fontWeight: "900", marginBottom: 6 }}>{label}</TText>
+      <TText
+        weight="semibold"
+        style={{ color: "#0F172A", marginBottom: 6, fontSize: 14 }}
+      >
+        {label}
+      </TText>
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -377,14 +334,17 @@ function Field({
         keyboardType={keyboardType}
         multiline={multiline}
         style={{
-          borderRadius: 18,
+          backgroundColor: "#FFFFFF",
           borderWidth: 1,
-          borderColor: "#EEF1FF",
-          backgroundColor: "#fff",
+          borderColor: "#D7E5DB",
+          borderRadius: 16,
           paddingHorizontal: 14,
-          paddingVertical: multiline ? 12 : 14,
-          minHeight: multiline ? 90 : undefined,
+          paddingVertical: multiline ? 14 : 12,
+          minHeight: multiline ? 96 : undefined,
+          textAlignVertical: multiline ? "top" : "center",
+          color: "#0F172A",
         }}
+        placeholderTextColor="#94A3B8"
       />
     </View>
   );
@@ -392,33 +352,44 @@ function Field({
 
 function PayChoice({ active, title, subtitle, icon, onPress }) {
   return (
-    <ScalePress onPress={onPress} style={{ flex: 1 }}>
+    <ScalePress onPress={onPress}>
       <View
         style={{
-          borderRadius: 22,
+          backgroundColor: active ? "#F0FDF4" : "#FFFFFF",
+          borderWidth: 1.2,
+          borderColor: active ? "#22C55E" : "#D7E5DB",
+          borderRadius: 18,
           padding: 14,
-          borderWidth: 1,
-          borderColor: active ? "#111827" : "#EEF1FF",
-          backgroundColor: active ? "#111827" : "#fff",
-          gap: 8,
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
         }}
       >
-        <Ionicons name={icon} size={18} color={active ? "#fff" : "#111827"} />
-        <TText
+        <View
           style={{
-            fontWeight: "900",
-            fontSize: 16,
-            color: active ? "#fff" : undefined,
+            width: 42,
+            height: 42,
+            borderRadius: 999,
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: active ? "#DCFCE7" : "#F1F5F9",
           }}
         >
-          {title}
-        </TText>
-        <TText
-          style={{ color: active ? "rgba(255,255,255,0.9)" : undefined }}
-          muted={!active}
-        >
-          {subtitle}
-        </TText>
+          <Ionicons name={icon} size={20} color={active ? "#166534" : "#475569"} />
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <TText weight="semibold" style={{ color: "#0F172A" }}>
+            {title}
+          </TText>
+          <TText style={{ color: "#64748B", marginTop: 2 }}>{subtitle}</TText>
+        </View>
+
+        <Ionicons
+          name={active ? "radio-button-on" : "radio-button-off"}
+          size={20}
+          color={active ? "#16A34A" : "#94A3B8"}
+        />
       </View>
     </ScalePress>
   );
@@ -427,16 +398,20 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
 function Row({ label, value, strong }) {
   return (
     <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
+      style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}
     >
-      <TText muted style={{ fontWeight: strong ? "900" : "700" }}>
+      <TText
+        weight={strong ? "bold" : "regular"}
+        style={{ color: strong ? "#0F172A" : "#475569" }}
+      >
         {label}
       </TText>
-      <TText style={{ fontWeight: strong ? "900" : "800" }}>{value}</TText>
+      <TText
+        weight={strong ? "bold" : "semibold"}
+        style={{ color: strong ? "#0F172A" : "#166534" }}
+      >
+        {value}
+      </TText>
     </View>
   );
 }

@@ -1,177 +1,330 @@
-import React from "react";
-import { View, Text, ScrollView, Pressable } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  View,
+  ScrollView,
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { useOrdersStore } from "../../src/store/ordersStore";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
-import { useThemeTokens } from "../../src/theme/useTheme";
+import { TText } from "../../src/components/ui/TText";
+import { useAuthStore } from "../../src/store/authStore";
+import { listOrders } from "../../src/lib/orders/listOrders";
 
-function formatDate(iso) {
+function formatKes(value) {
+  return `KES ${Number(value || 0)}`;
+}
+
+function formatDate(value) {
+  if (!value) return "—";
   try {
-    const d = new Date(iso);
-    return d.toLocaleString();
+    return new Date(value).toLocaleString();
   } catch {
-    return iso;
+    return value;
   }
 }
 
-function statusLabel(status) {
+function getStatusTone(status) {
   switch (status) {
-    case "pending":
-      return "Pending";
+    case "paid":
     case "confirmed":
-      return "Confirmed";
-    case "preparing":
-      return "Preparing";
-    case "out_for_delivery":
-      return "Out for delivery";
     case "delivered":
-      return "Delivered";
+      return {
+        bg: "#ECFDF3",
+        border: "#A7F3D0",
+        text: "#166534",
+      };
+    case "payment_failed":
     case "cancelled":
-      return "Cancelled";
+      return {
+        bg: "#FEF2F2",
+        border: "#FECACA",
+        text: "#991B1B",
+      };
+    case "awaiting_payment":
+    case "pending":
+      return {
+        bg: "#FFFBEB",
+        border: "#FDE68A",
+        text: "#92400E",
+      };
     default:
-      return status;
+      return {
+        bg: "#F8FAFC",
+        border: "#CBD5E1",
+        text: "#334155",
+      };
   }
 }
 
-export default function Orders() {
+function getReadableStatus(status) {
+  if (!status) return "Unknown";
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+export default function OrdersScreen() {
   const router = useRouter();
-  const t = useThemeTokens();
 
-  const orders = useOrdersStore((s) => s.orders);
-  const clearOrders = useOrdersStore((s) => s.clearOrders);
+  const user = useAuthStore((s) => s.user);
+  const isHydrating = useAuthStore((s) => s.isHydrating);
 
-  if (orders.length === 0) {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadOrders = useCallback(async ({ silent = false } = {}) => {
+    if (!user?.id) return;
+
+    try {
+      if (!silent) setLoading(true);
+      else setRefreshing(true);
+
+      const data = await listOrders(user.id);
+      setOrders(data);
+    } catch (error) {
+      console.error("Failed to load orders:", error);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isHydrating) return;
+
+    if (!user) {
+      router.replace("/(auth)/login");
+      return;
+    }
+
+    loadOrders();
+  }, [isHydrating, user, router, loadOrders]);
+
+  if (loading) {
     return (
-      <View style={{ flex: 1, backgroundColor: t.bg }}>
+      <LinearGradient colors={["#F7FBF8", "#EEF8F2", "#FDFDFD"]} style={{ flex: 1 }}>
         <View
           style={{
             flex: 1,
-            justifyContent: "center",
             alignItems: "center",
-            gap: 10,
-            paddingHorizontal: 16,
+            justifyContent: "center",
+            padding: 24,
           }}
         >
-          <Ionicons name="receipt-outline" size={40} color={t.text} />
-          <Text style={{ fontSize: 18, fontWeight: "900", color: t.text }}>
-            No orders yet
-          </Text>
-          <Text style={{ color: t.mutedText, textAlign: "center" }}>
-            Place your first order and it will show up here.
-          </Text>
-
-          <Pressable
-            onPress={() => router.push("/(shop)/categories")}
-            style={{
-              marginTop: 10,
-              paddingHorizontal: 14,
-              paddingVertical: 12,
-              borderRadius: 18,
-              backgroundColor: t.darkButton,
-            }}
-          >
-            <Text style={{ color: "#fff", fontWeight: "900" }}>
-              Browse juices
-            </Text>
-          </Pressable>
+          <ActivityIndicator size="large" color="#16A34A" />
+          <TText style={{ marginTop: 12, color: "#475569" }}>
+            Loading your orders...
+          </TText>
         </View>
-      </View>
+      </LinearGradient>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: t.bg }}>
+    <LinearGradient colors={["#F7FBF8", "#EEF8F2", "#FDFDFD"]} style={{ flex: 1 }}>
       <ScrollView
+        contentContainerStyle={{ padding: 16, paddingBottom: 36 }}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => loadOrders({ silent: true })}
+            tintColor="#16A34A"
+          />
+        }
       >
         <View
           style={{
+            marginTop: 26,
+            marginBottom: 18,
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
-            marginBottom: 10,
+            gap: 12,
           }}
         >
-          <Text style={{ fontSize: 20, fontWeight: "900", color: t.text }}>
-            My Orders
-          </Text>
+          <View style={{ flex: 1 }}>
+            <TText weight="bold" style={{ fontSize: 28, color: "#0F172A" }}>
+              My Orders
+            </TText>
+            <TText style={{ marginTop: 6, color: "#475569" }}>
+              Track your juice deliveries and payment progress.
+            </TText>
+          </View>
 
-          <Pressable onPress={clearOrders}>
-            <Text style={{ fontWeight: "900", color: t.text }}>Clear</Text>
+          <Pressable
+            onPress={() => loadOrders({ silent: true })}
+            style={{
+              width: 42,
+              height: 42,
+              borderRadius: 999,
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#D7E5DB",
+            }}
+          >
+            <Ionicons
+              name={refreshing ? "hourglass-outline" : "refresh-outline"}
+              size={20}
+              color="#166534"
+            />
           </Pressable>
         </View>
 
-        <View style={{ gap: 12 }}>
-          {orders.map((o) => (
-            <Pressable
-              key={o.id}
-              onPress={() => router.push(`/(orders)/order/${o.id}`)}
+        {orders.length === 0 ? (
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 22,
+              padding: 24,
+              borderWidth: 1,
+              borderColor: "#E5E7EB",
+              alignItems: "center",
+              marginTop: 8,
+            }}
+          >
+            <Ionicons name="receipt-outline" size={42} color="#94A3B8" />
+            <TText
+              weight="bold"
+              style={{ marginTop: 12, fontSize: 18, color: "#0F172A" }}
+            >
+              No orders yet
+            </TText>
+            <TText
               style={{
-                borderRadius: 22,
-                borderWidth: 1,
-                borderColor: t.border,
-                backgroundColor: t.card,
-                padding: 14,
-                gap: 10,
+                marginTop: 6,
+                color: "#64748B",
+                textAlign: "center",
+                lineHeight: 22,
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                <View
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 16,
-                    backgroundColor: t.chipBg,
-                    borderWidth: 1,
-                    borderColor: t.chipBorder,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  <Ionicons name="receipt" size={18} color={t.text} />
-                </View>
+              Once you place an order, it will appear here for tracking.
+            </TText>
 
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontWeight: "900", color: t.text }} numberOfLines={1}>
-                    {o.id}
-                  </Text>
-                  <Text style={{ color: t.mutedText, marginTop: 2 }}>
-                    {formatDate(o.createdAt)}
-                  </Text>
-                </View>
-
-                <View
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    borderRadius: 999,
-                    backgroundColor: t.darkButton,
-                  }}
-                >
-                  <Text style={{ color: "#fff", fontWeight: "900" }}>
-                    {statusLabel(o.status)}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <Text style={{ color: t.mutedText, fontWeight: "800" }}>
-                  {o.items.length} item(s)
-                </Text>
-                <Text style={{ fontWeight: "900", color: t.text }}>
-                  KES {o.pricing.totalKes}
-                </Text>
-              </View>
-
-              <Text style={{ color: t.mutedText }} numberOfLines={1}>
-                {o.delivery.zoneTitle} • {o.delivery.rangeLabel}
-              </Text>
+            <Pressable
+              onPress={() => router.push("/(shop)")}
+              style={{
+                marginTop: 16,
+                backgroundColor: "#16A34A",
+                paddingHorizontal: 18,
+                paddingVertical: 12,
+                borderRadius: 14,
+              }}
+            >
+              <TText weight="bold" style={{ color: "#FFFFFF" }}>
+                Start shopping
+              </TText>
             </Pressable>
-          ))}
-        </View>
+          </View>
+        ) : (
+          <View style={{ gap: 12 }}>
+            {orders.map((order) => {
+              const tone = getStatusTone(order.status);
+
+              return (
+                <Pressable
+                  key={order.id}
+                  onPress={() => router.push(`/(orders)/order/${order.id}`)}
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: 20,
+                    padding: 16,
+                    borderWidth: 1,
+                    borderColor: "#E5E7EB",
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      gap: 12,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <TText weight="bold" style={{ fontSize: 16, color: "#0F172A" }}>
+                        {order.order_number || order.id}
+                      </TText>
+                      <TText style={{ marginTop: 4, color: "#64748B" }}>
+                        {formatDate(order.created_at)}
+                      </TText>
+                    </View>
+
+                    <View
+                      style={{
+                        backgroundColor: tone.bg,
+                        borderColor: tone.border,
+                        borderWidth: 1,
+                        borderRadius: 999,
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                      }}
+                    >
+                      <TText
+                        weight="semibold"
+                        style={{ color: tone.text, fontSize: 12 }}
+                      >
+                        {getReadableStatus(order.status)}
+                      </TText>
+                    </View>
+                  </View>
+
+                  <View style={{ marginTop: 14, gap: 8 }}>
+                    <InfoRow label="Payment" value={getReadableStatus(order.payment_method)} />
+                    <InfoRow label="Payment status" value={getReadableStatus(order.payment_status)} />
+                    <InfoRow label="Zone" value={order.delivery_zone_title || "—"} />
+                    <InfoRow label="Total" value={formatKes(order.total_kes)} strong />
+                  </View>
+
+                  <View
+                    style={{
+                      marginTop: 14,
+                      paddingTop: 12,
+                      borderTopWidth: 1,
+                      borderTopColor: "#E5E7EB",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <TText style={{ color: "#166534" }}>View details</TText>
+                    <Ionicons name="chevron-forward" size={18} color="#166534" />
+                  </View>
+                </Pressable>
+              );
+            })}
+          </View>
+        )}
       </ScrollView>
+    </LinearGradient>
+  );
+}
+
+function InfoRow({ label, value, strong = false }) {
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 12,
+      }}
+    >
+      <TText style={{ color: "#475569" }}>{label}</TText>
+      <TText
+        weight={strong ? "bold" : "semibold"}
+        style={{ color: strong ? "#0F172A" : "#166534", textAlign: "right", flex: 1 }}
+      >
+        {String(value ?? "—")}
+      </TText>
     </View>
   );
 }

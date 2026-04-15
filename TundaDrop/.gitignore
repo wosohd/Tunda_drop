@@ -41,3 +41,14 @@ app-example
 # generated native folders
 /ios
 /android
+
+# env
+.env
+.env.*
+!.env.example
+
+# Supabase local/dev
+.supabase/
+
+# local overrides
+*.local
