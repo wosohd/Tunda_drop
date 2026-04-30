@@ -124,7 +124,7 @@ export default function Cart() {
         <GradientButton
           title="Continue to checkout"
           subtitle={`KES ${totals.discountedSubtotalKes} + delivery`}
-          onPress={() => router.push("/(shop)/checkout")}
+          onPress={() => router.push("/checkout")}
           right={
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <Ionicons name="card" size={18} color="#fff" />

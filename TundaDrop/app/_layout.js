@@ -9,7 +9,7 @@ import { useAuthStore } from "../src/store/authStore";
 import { useThemeStore } from "../src/store/themeStore";
 import { useThemeTokens } from "../src/theme/useTheme";
 
-const AUTH_ONLY_PREFIXES = ["/(shop)/checkout", "/(orders)"];
+const AUTH_ONLY_PREFIXES = ["/checkout", "/orders", "/order"];
 
 export default function RootLayout() {
   const pathname = usePathname();
@@ -27,6 +27,9 @@ export default function RootLayout() {
 
   const t = useThemeTokens();
 
+  const stripePublishableKey =
+    process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || "";
+
   useEffect(() => {
     hydrateAuth();
     hydrateTheme();
@@ -34,9 +37,13 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (isAuthHydrating) return;
+
     const authed = !!user;
     const needsAuth = AUTH_ONLY_PREFIXES.some((p) => pathname.startsWith(p));
-    if (!authed && needsAuth) router.replace("/(auth)/login");
+
+    if (!authed && needsAuth) {
+      router.replace("/(auth)/login");
+    }
   }, [pathname, user, isAuthHydrating]);
 
   const isHydrating = isAuthHydrating || isThemeHydrating;
@@ -117,10 +124,7 @@ export default function RootLayout() {
 
   if (isHydrating) {
     return (
-      <StripeProvider
-        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-        merchantIdentifier="merchant.com.tundadrop"
-      >
+      <StripeProvider publishableKey={stripePublishableKey}>
         <SafeAreaProvider>
           <View
             style={{
@@ -138,10 +142,7 @@ export default function RootLayout() {
   }
 
   return (
-    <StripeProvider
-      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}
-      merchantIdentifier="merchant.com.tundadrop"
-    >
+    <StripeProvider publishableKey={stripePublishableKey}>
       <SafeAreaProvider>
         <Stack
           screenOptions={{

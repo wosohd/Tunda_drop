@@ -19,7 +19,7 @@ import { calcTotalsKes } from "../../src/lib/money";
 import { TText } from "../../src/components/ui/TText";
 import { useAuthStore } from "../../src/store/authStore";
 import { createOrder } from "../../src/lib/orders/createOrder";
-import { createStripePaymentIntent } from "../../src/services/stripeService";
+import { createStripePaymentIntent } from "../../src/lib/stripeService";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
@@ -99,7 +99,7 @@ export default function Checkout() {
     !!paymentMethod &&
     !isSubmitting;
 
-  async function createSavedOrder() {
+  async function saveOrderAfterPayment() {
     const { order } = await createOrder({
       user,
       items,
@@ -112,7 +112,7 @@ export default function Checkout() {
     return order;
   }
 
-  async function handleStripeCardPayment() {
+  async function handleCardPayment() {
     const orderReference = `TD-${Date.now()}`;
 
     const paymentIntent = await createStripePaymentIntent({
@@ -190,9 +190,9 @@ export default function Checkout() {
       setIsSubmitting(true);
 
       if (paymentMethod === "card") {
-        await handleStripeCardPayment();
+        await handleCardPayment();
 
-        const order = await createSavedOrder();
+        const order = await saveOrderAfterPayment();
 
         Alert.alert(
           "Payment successful",
@@ -214,7 +214,7 @@ export default function Checkout() {
       }
 
       if (paymentMethod === "mpesa") {
-        const order = await createSavedOrder();
+        const order = await saveOrderAfterPayment();
 
         Alert.alert(
           "Order created",
@@ -519,6 +519,5 @@ function Row({ label, value, strong }) {
     </View>
   );
 }
-
 
 

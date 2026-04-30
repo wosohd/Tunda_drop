@@ -1,0 +1,468 @@
+# TundaDrop Payment Testing Log
+
+## Purpose
+
+This file records the payment integration tests completed for TundaDrop during the M-Pesa and Stripe checkout debugging session.
+
+The goal was to confirm that customers can move from cart to checkout, select a payment method, and complete or initiate payment correctly.
+
+---
+
+## Payment Systems Tested
+
+TundaDrop currently supports two checkout payment paths:
+
+1. M-Pesa
+2. Stripe card payment
+
+---
+
+## Environment Setup Confirmed
+
+### Backend Environment
+
+The backend `.env` was configured with payment-related variables.
+
+Required Stripe backend variables:
+
+```env
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_CURRENCY=kes
+```
+
+Existing M-Pesa backend variables:
+
+```env
+MPESA_ENV=sandbox
+MPESA_CONSUMER_KEY=...
+MPESA_CONSUMER_SECRET=...
+MPESA_SHORTCODE=...
+MPESA_PASSKEY=...
+MPESA_CALLBACK_BASE_URL=...
+```
+
+### Mobile App Environment
+
+The mobile app `.env` was configured with Expo public variables.
+
+```env
+EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+EXPO_PUBLIC_API_URL=http://localhost:3000
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+For physical device testing, `localhost` should be replaced with the computer's local IPv4 address:
+
+```env
+EXPO_PUBLIC_API_URL=http://192.168.x.x:3000
+```
+
+---
+
+## Backend Startup Test
+
+### Command
+
+```powershell
+cd backend
+npm run dev
+```
+
+### Expected Result
+
+```txt
+TundaDrop backend running on port 3000
+```
+
+### Final Status
+
+Passed.
+
+The backend successfully started after installing missing backend dependencies.
+
+---
+
+## Backend Root Endpoint Test
+
+### Command
+
+```powershell
+Invoke-RestMethod http://localhost:3000
+```
+
+### Expected Result
+
+```json
+{
+  "success": true,
+  "message": "TundaDrop backend is running."
+}
+```
+
+### Final Status
+
+Passed.
+
+The backend root endpoint responded successfully.
+
+---
+
+## Stripe PaymentIntent Endpoint Test
+
+### Command
+
+```powershell
+$body = @{
+  amount = 150000
+  currency = "kes"
+  orderReference = "TD-TEST-001"
+  customer = @{
+    name = "Test Customer"
+    email = "test@tundadrop.com"
+    phone = "0712345678"
+    address = "Nairobi CBD"
+  }
+} | ConvertTo-Json -Depth 3
+
+Invoke-RestMethod `
+  -Uri "http://localhost:3000/stripe/create-payment-intent" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+### Expected Result
+
+```txt
+success         : True
+clientSecret    : pi_..._secret_...
+paymentIntentId : pi_...
+```
+
+### Issues Encountered
+
+Initial error:
+
+```txt
+Invalid API Key provided
+```
+
+### Root Cause
+
+The backend was using an invalid Stripe key or the wrong kind of Stripe credential.
+
+### Fix
+
+The backend `.env` was updated to use the real Stripe Secret Key from:
+
+```txt
+Stripe Dashboard -> Developers -> API keys -> Secret key
+```
+
+The backend was then restarted.
+
+### Final Status
+
+Passed.
+
+The backend successfully created a Stripe PaymentIntent.
+
+---
+
+## Expo App Startup Test
+
+### Command
+
+```powershell
+npx expo start --clear
+```
+
+### Issues Encountered
+
+#### Issue 1: Expo Bundling Backend Files
+
+Error indicated that Expo was trying to bundle backend files:
+
+```txt
+Unable to resolve "@babel/runtime/helpers/asyncToGenerator" from "routes/stripe.js"
+```
+
+### Root Cause
+
+Backend files were visible to the Expo mobile app bundler or placed outside the proper backend folder.
+
+### Fix
+
+Backend files were kept inside:
+
+```txt
+backend/server.js
+backend/routes/stripe.js
+backend/package.json
+backend/.env
+```
+
+The mobile app only imports:
+
+```txt
+src/lib/stripeService.js
+```
+
+It does not import backend files directly.
+
+---
+
+#### Issue 2: Stripe Plugin Config Error
+
+Error:
+
+```txt
+Cannot read properties of undefined (reading 'merchantIdentifier')
+```
+
+### Root Cause
+
+The Stripe config plugin in `app.json` was included without an options object.
+
+### Fix
+
+Updated `app.json` plugin entry:
+
+```json
+[
+  "@stripe/stripe-react-native",
+  {
+    "merchantIdentifier": "",
+    "enableGooglePay": false
+  }
+]
+```
+
+Also removed `merchantIdentifier` from the runtime `StripeProvider` in `_layout.js`.
+
+### Final Status
+
+Passed.
+
+Expo started successfully.
+
+---
+
+## Supabase Environment Test
+
+### Issue Encountered
+
+Error:
+
+```txt
+Missing Supabase env vars. Add EXPO_PUBLIC_SUPABASE_URL and EXPO_PUBLIC_SUPABASE_ANON_KEY to .env
+```
+
+### Root Cause
+
+The mobile app `.env` did not yet include Supabase public environment variables.
+
+### Fix
+
+Added:
+
+```env
+EXPO_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Final Status
+
+Passed.
+
+The app started without Supabase environment errors.
+
+---
+
+## Checkout Navigation Test
+
+### Issue Encountered
+
+Phone displayed:
+
+```txt
+Unmatched route page cannot be found
+```
+
+### Root Cause
+
+The app was navigating to an incorrect checkout route.
+
+The correct checkout file is:
+
+```txt
+app/(shop)/checkout.js
+```
+
+Because `(shop)` is an Expo Router route group, the real path is:
+
+```txt
+/checkout
+```
+
+### Fix
+
+Cart checkout navigation should use:
+
+```js
+router.push("/checkout");
+```
+
+### Final Status
+
+Passed.
+
+The app successfully navigated to checkout.
+
+---
+
+## M-Pesa Checkout Path Test
+
+### Test Flow
+
+1. Open app.
+2. Choose product.
+3. Select quantity.
+4. Add item to cart.
+5. Proceed to checkout.
+6. Enter delivery details.
+7. Select M-Pesa.
+8. Attempt to start M-Pesa payment.
+
+### Expected Result
+
+```txt
+M-Pesa payment starts and customer receives STK Push prompt.
+```
+
+### Actual Result
+
+The app reached the M-Pesa payment initiation step, but the M-Pesa prompt did not appear.
+
+Error shown:
+
+```txt
+M-Pesa start fail, Edge Function returned a non-2xx status code
+```
+
+### Interpretation
+
+The mobile checkout flow is working correctly.
+
+The remaining issue is inside the Supabase Edge Function or M-Pesa Daraja environment configuration.
+
+### Likely Areas to Debug Next
+
+1. Supabase Edge Function secrets.
+2. M-Pesa consumer key and consumer secret.
+3. M-Pesa shortcode.
+4. M-Pesa passkey.
+5. Callback URL.
+6. Phone number format.
+7. Daraja sandbox/live environment mismatch.
+8. Edge Function logs.
+9. Daraja API response body.
+
+### Final Status
+
+Partially passed.
+
+App flow passed. STK Push backend initiation needs further debugging.
+
+---
+
+## Stripe Card Checkout Path Test
+
+### Test Flow
+
+1. Open app.
+2. Choose product.
+3. Select quantity.
+4. Add item to cart.
+5. Proceed to checkout.
+6. Enter delivery details.
+7. Select Card.
+8. Open Stripe PaymentSheet.
+9. Complete test card payment.
+
+### Test Card Used
+
+```txt
+4242 4242 4242 4242
+Any future expiry date
+Any 3-digit CVC
+Any postal code
+```
+
+### Expected Result
+
+```txt
+Stripe PaymentSheet opens.
+Payment succeeds.
+Stripe dashboard records the payment.
+The app completes the checkout flow.
+```
+
+### Actual Result
+
+Stripe checkout worked successfully.
+
+Payment was reflected in Stripe.
+
+Stripe payment status appeared as pending after successful test processing.
+
+### Final Status
+
+Passed.
+
+Stripe card payment integration is working correctly.
+
+---
+
+## Final Payment Test Checklist
+
+```txt
+[x] Backend dependencies installed
+[x] Backend starts successfully
+[x] Backend root endpoint works
+[x] Stripe PaymentIntent endpoint works
+[x] Expo starts successfully
+[x] StripeProvider configured
+[x] Stripe config plugin fixed in app.json
+[x] Supabase env variables added
+[x] Checkout route fixed
+[x] Product can be added to cart
+[x] Quantity can be updated
+[x] Checkout screen opens
+[x] M-Pesa app flow reaches payment initiation
+[ ] M-Pesa STK Push prompt appears
+[x] Card checkout opens Stripe PaymentSheet
+[x] Stripe test payment completes
+[x] Stripe dashboard receives the transaction
+```
+
+---
+
+## Current Payment Status Summary
+
+Stripe card payment is complete and working.
+
+M-Pesa checkout is working on the app side but still needs Supabase Edge Function debugging before the STK Push prompt can appear reliably.
+
+---
+
+## Next Debugging Task
+
+Debug the Supabase Edge Function that starts M-Pesa payment.
+
+Primary goal:
+
+```txt
+Find why the Edge Function returns a non-2xx response during M-Pesa STK Push initiation.
+```
