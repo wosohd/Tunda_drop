@@ -10,6 +10,7 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useStripe } from "@stripe/stripe-react-native";
 
 import { DELIVERY_ZONES } from "../../src/constants/deliveryZones";
 import { useCheckoutStore } from "../../src/store/checkoutStore";
@@ -18,6 +19,7 @@ import { calcTotalsKes } from "../../src/lib/money";
 import { TText } from "../../src/components/ui/TText";
 import { useAuthStore } from "../../src/store/authStore";
 import { createOrder } from "../../src/lib/orders/createOrder";
+import { createStripePaymentIntent } from "../../src/services/stripeService";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
@@ -51,6 +53,8 @@ function ScalePress({ children, onPress, style, disabled }) {
 
 export default function Checkout() {
   const router = useRouter();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
+
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const user = useAuthStore((s) => s.user);
@@ -95,6 +99,74 @@ export default function Checkout() {
     !!paymentMethod &&
     !isSubmitting;
 
+  async function createSavedOrder() {
+    const { order } = await createOrder({
+      user,
+      items,
+      zoneId,
+      address,
+      phone,
+      paymentMethod,
+    });
+
+    return order;
+  }
+
+  async function handleStripeCardPayment() {
+    const orderReference = `TD-${Date.now()}`;
+
+    const paymentIntent = await createStripePaymentIntent({
+      amountKes: totals.totalKes,
+      orderReference,
+      customer: {
+        name: user?.name || user?.email || "TundaDrop Customer",
+        email: user?.email || "",
+        phone,
+        address,
+      },
+    });
+
+    const initResult = await initPaymentSheet({
+      merchantDisplayName: "TundaDrop",
+      paymentIntentClientSecret: paymentIntent.clientSecret,
+      allowsDelayedPaymentMethods: false,
+      defaultBillingDetails: {
+        name: user?.name || user?.email || "TundaDrop Customer",
+        email: user?.email || "",
+        phone,
+        address: {
+          line1: address,
+          country: "KE",
+        },
+      },
+    });
+
+    if (initResult.error) {
+      throw new Error(
+        initResult.error.message || "Unable to open card payment."
+      );
+    }
+
+    const paymentResult = await presentPaymentSheet();
+
+    if (paymentResult.error) {
+      const isCanceled =
+        paymentResult.error.code === "Canceled" ||
+        paymentResult.error.code === "canceled";
+
+      const error = new Error(
+        isCanceled
+          ? "Card payment was canceled. No order was placed."
+          : paymentResult.error.message || "Card payment failed."
+      );
+
+      error.isCanceled = isCanceled;
+      throw error;
+    }
+
+    return paymentIntent;
+  }
+
   async function handleCreateOrder() {
     if (!user) {
       Alert.alert("Sign in required", "Please sign in to place an order.", [
@@ -117,36 +189,62 @@ export default function Checkout() {
     try {
       setIsSubmitting(true);
 
-      const { order } = await createOrder({
-        user,
-        items,
-        zoneId,
-        address,
-        phone,
-        paymentMethod,
-      });
+      if (paymentMethod === "card") {
+        await handleStripeCardPayment();
 
-      Alert.alert(
-        "Order created",
-        `Order ${order.order_number ?? order.id} has been saved successfully.\n\nNext: ${paymentMethod.toUpperCase()} payment.`,
-        [
-          {
-            text: "Continue",
-            onPress: () => {
-              clearCart();
+        const order = await createSavedOrder();
 
-              // For Step 2, go to the order page first.
-              // In Step 3/4, this can route into M-Pesa or Stripe initiation.
-              router.replace(`/(orders)/order/${order.id}`);
+        Alert.alert(
+          "Payment successful",
+          `Card payment was completed and order ${
+            order.order_number ?? order.id
+          } has been saved successfully.`,
+          [
+            {
+              text: "View order",
+              onPress: () => {
+                clearCart();
+                router.replace(`/(orders)/order/${order.id}`);
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+
+        return;
+      }
+
+      if (paymentMethod === "mpesa") {
+        const order = await createSavedOrder();
+
+        Alert.alert(
+          "Order created",
+          `Order ${
+            order.order_number ?? order.id
+          } has been saved successfully.\n\nNext: M-Pesa payment.`,
+          [
+            {
+              text: "Continue",
+              onPress: () => {
+                clearCart();
+                router.replace(`/(orders)/order/${order.id}`);
+              },
+            },
+          ]
+        );
+
+        return;
+      }
+
+      Alert.alert("Payment method required", "Please select a payment method.");
     } catch (error) {
-      Alert.alert(
-        "Could not create order",
-        error?.message || "Something went wrong while saving your order."
-      );
+      if (error?.isCanceled) {
+        Alert.alert("Payment canceled", error.message);
+      } else {
+        Alert.alert(
+          "Payment error",
+          error?.message || "Something went wrong while processing payment."
+        );
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -239,7 +337,7 @@ export default function Checkout() {
           <PayChoice
             active={paymentMethod === "card"}
             title="Card"
-            subtitle="Pay with Stripe"
+            subtitle="Pay securely with Stripe"
             icon="card-outline"
             onPress={() => setPaymentMethod("card")}
           />
@@ -283,7 +381,9 @@ export default function Checkout() {
           >
             <TText weight="bold" style={{ color: "white", fontSize: 16 }}>
               {isSubmitting
-                ? "Saving order..."
+                ? paymentMethod === "card"
+                  ? "Processing card..."
+                  : "Saving order..."
                 : `Pay ${payLabel} • KES ${totals.totalKes}`}
             </TText>
           </LinearGradient>
@@ -375,7 +475,11 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
             backgroundColor: active ? "#DCFCE7" : "#F1F5F9",
           }}
         >
-          <Ionicons name={icon} size={20} color={active ? "#166534" : "#475569"} />
+          <Ionicons
+            name={icon}
+            size={20}
+            color={active ? "#166534" : "#475569"}
+          />
         </View>
 
         <View style={{ flex: 1 }}>

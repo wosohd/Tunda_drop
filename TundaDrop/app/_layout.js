@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, ActivityIndicator, Pressable, Text, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { StripeProvider } from "@stripe/stripe-react-native";
 
 import { useAuthStore } from "../src/store/authStore";
 import { useThemeStore } from "../src/store/themeStore";
@@ -41,16 +42,17 @@ export default function RootLayout() {
   const isHydrating = isAuthHydrating || isThemeHydrating;
 
   function cycleMode() {
-    const next = mode === "system" ? "light" : mode === "light" ? "dark" : "system";
+    const next =
+      mode === "system" ? "light" : mode === "light" ? "dark" : "system";
     setMode(next);
   }
 
-  const themeIcon = mode === "dark" ? "moon" : mode === "light" ? "sunny" : "contrast";
+  const themeIcon =
+    mode === "dark" ? "moon" : mode === "light" ? "sunny" : "contrast";
 
   const HeaderRightHome = () => {
     return (
       <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        {/* Theme toggle (Home only) */}
         <Pressable
           onPress={cycleMode}
           hitSlop={10}
@@ -68,7 +70,6 @@ export default function RootLayout() {
           <Ionicons name={themeIcon} size={18} color={t.text} />
         </Pressable>
 
-        {/* Auth button */}
         {!user ? (
           <Pressable
             onPress={() => router.push("/(auth)/login")}
@@ -116,43 +117,72 @@ export default function RootLayout() {
 
   if (isHydrating) {
     return (
-      <SafeAreaProvider>
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: t.bg }}>
-          <ActivityIndicator />
-        </View>
-      </SafeAreaProvider>
+      <StripeProvider
+        publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+        merchantIdentifier="merchant.com.tundadrop"
+      >
+        <SafeAreaProvider>
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              backgroundColor: t.bg,
+            }}
+          >
+            <ActivityIndicator />
+          </View>
+        </SafeAreaProvider>
+      </StripeProvider>
     );
   }
 
   return (
-    <SafeAreaProvider>
-      <Stack
-        screenOptions={{
-          headerTitleAlign: "center",
-          contentStyle: { padding: 16, backgroundColor: t.bg },
-          headerStyle: { backgroundColor: t.bg },
-          headerTintColor: t.text,
-        }}
-      >
-        <Stack.Screen
-          name="index"
-          options={{
-            title: "TundaDrop",
-            headerRight: () => <HeaderRightHome />,
+    <StripeProvider
+      publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY}
+      merchantIdentifier="merchant.com.tundadrop"
+    >
+      <SafeAreaProvider>
+        <Stack
+          screenOptions={{
+            headerTitleAlign: "center",
+            contentStyle: { padding: 16, backgroundColor: t.bg },
+            headerStyle: { backgroundColor: t.bg },
+            headerTintColor: t.text,
           }}
-        />
+        >
+          <Stack.Screen
+            name="index"
+            options={{
+              title: "TundaDrop",
+              headerRight: () => <HeaderRightHome />,
+            }}
+          />
 
-        <Stack.Screen name="(auth)/login" options={{ title: "Login" }} />
-        <Stack.Screen name="(auth)/register" options={{ title: "Create account" }} />
+          <Stack.Screen name="(auth)/login" options={{ title: "Login" }} />
+          <Stack.Screen
+            name="(auth)/register"
+            options={{ title: "Create account" }}
+          />
 
-        <Stack.Screen name="(shop)/categories" options={{ title: "Categories" }} />
-        <Stack.Screen name="(shop)/product/[id]" options={{ title: "Product" }} />
-        <Stack.Screen name="(shop)/cart" options={{ title: "Cart" }} />
-        <Stack.Screen name="(shop)/checkout" options={{ title: "Checkout" }} />
+          <Stack.Screen
+            name="(shop)/categories"
+            options={{ title: "Categories" }}
+          />
+          <Stack.Screen
+            name="(shop)/product/[id]"
+            options={{ title: "Product" }}
+          />
+          <Stack.Screen name="(shop)/cart" options={{ title: "Cart" }} />
+          <Stack.Screen
+            name="(shop)/checkout"
+            options={{ title: "Checkout" }}
+          />
 
-        <Stack.Screen name="(orders)/orders" options={{ title: "My Orders" }} />
-        <Stack.Screen name="(orders)/order/[id]" options={{ title: "Order" }} />
-      </Stack>
-    </SafeAreaProvider>
+          <Stack.Screen name="(orders)/orders" options={{ title: "My Orders" }} />
+          <Stack.Screen name="(orders)/order/[id]" options={{ title: "Order" }} />
+        </Stack>
+      </SafeAreaProvider>
+    </StripeProvider>
   );
 }
