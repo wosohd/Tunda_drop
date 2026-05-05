@@ -28,6 +28,26 @@ export function assertMpesaConfig() {
   }
 }
 
+export function formatMpesaPhone(phone: string) {
+  const cleaned = phone.replace(/\D/g, "");
+
+  if (cleaned.startsWith("254") && cleaned.length === 12) {
+    return cleaned;
+  }
+
+  if (cleaned.startsWith("07") && cleaned.length === 10) {
+    return `254${cleaned.slice(1)}`;
+  }
+
+  if (cleaned.startsWith("7") && cleaned.length === 9) {
+    return `254${cleaned}`;
+  }
+
+  throw new Error(
+    "Invalid M-Pesa phone number. Use 07XXXXXXXX or 2547XXXXXXXX.",
+  );
+}
+
 export function getTimestamp() {
   const now = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -44,6 +64,18 @@ export function getTimestamp() {
 
 export function buildStkPassword(timestamp: string) {
   return btoa(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`);
+}
+
+async function readJsonResponse(response: Response) {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return {
+      raw: text,
+    };
+  }
 }
 
 export async function getAccessToken() {
@@ -63,11 +95,14 @@ export async function getAccessToken() {
     },
   );
 
-  const data = await response.json();
+  const data = await readJsonResponse(response);
 
   if (!response.ok || !data.access_token) {
     throw new Error(
-      data.errorMessage || data.error_description || "Failed to get M-Pesa access token.",
+      data.errorMessage ||
+        data.error_description ||
+        data.raw ||
+        "Failed to get M-Pesa access token.",
     );
   }
 
@@ -89,6 +124,7 @@ export async function initiateStkPush(payload: StkPayload) {
   const timestamp = getTimestamp();
   const password = buildStkPassword(timestamp);
   const callbackPath = payload.callbackPath ?? "/functions/v1/mpesa-callback";
+  const phone = formatMpesaPhone(payload.phone);
 
   const body = {
     BusinessShortCode: MPESA_SHORTCODE,
@@ -96,9 +132,9 @@ export async function initiateStkPush(payload: StkPayload) {
     Timestamp: timestamp,
     TransactionType: "CustomerPayBillOnline",
     Amount: Math.round(payload.amountKes),
-    PartyA: payload.phone,
+    PartyA: phone,
     PartyB: MPESA_SHORTCODE,
-    PhoneNumber: payload.phone,
+    PhoneNumber: phone,
     CallBackURL: `${MPESA_CALLBACK_BASE_URL}${callbackPath}`,
     AccountReference: payload.accountReference,
     TransactionDesc: payload.transactionDesc,
@@ -116,11 +152,14 @@ export async function initiateStkPush(payload: StkPayload) {
     },
   );
 
-  const data = await response.json();
+  const data = await readJsonResponse(response);
 
   if (!response.ok) {
     throw new Error(
-      data.errorMessage || data.ResponseDescription || "Failed to initiate STK push.",
+      data.errorMessage ||
+        data.ResponseDescription ||
+        data.raw ||
+        "Failed to initiate STK push.",
     );
   }
 

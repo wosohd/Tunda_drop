@@ -9,6 +9,7 @@ Deno.serve(async (req) => {
 
   try {
     const authHeader = req.headers.get("Authorization") ?? "";
+
     if (!authHeader) {
       return json({ error: "Missing Authorization header." }, 401);
     }
@@ -46,16 +47,17 @@ Deno.serve(async (req) => {
       return json({ error: "Order is already paid." }, 409);
     }
 
-    const { data: existingPayment, error: existingPaymentError } = await supabaseAdmin
-      .from("payments")
-      .select("*")
-      .eq("order_id", order.id)
-      .eq("provider", "mpesa")
-      .eq("method", "stk_push")
-      .eq("status", "processing")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const { data: existingPayment, error: existingPaymentError } =
+      await supabaseAdmin
+        .from("payments")
+        .select("*")
+        .eq("order_id", order.id)
+        .eq("provider", "mpesa")
+        .eq("method", "stk_push")
+        .eq("status", "processing")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
     if (existingPaymentError) {
       return json({ error: existingPaymentError.message }, 500);
@@ -67,14 +69,19 @@ Deno.serve(async (req) => {
         paymentId: existingPayment.id,
         orderId: order.id,
         checkoutRequestId: existingPayment.checkout_request_id ?? null,
-        merchantRequestId: existingPayment.merchant_request_id ?? existingPayment.provider_reference ?? null,
+        merchantRequestId:
+          existingPayment.merchant_request_id ??
+          existingPayment.provider_reference ??
+          null,
         responseCode: existingPayment.result_code ?? "0",
-        responseDescription: existingPayment.result_desc ?? "An STK request is already in progress.",
+        responseDescription:
+          existingPayment.result_desc ?? "An STK request is already in progress.",
         customerMessage: "An STK Push is already in progress for this order.",
       });
     }
 
     const msisdn = String(phone || order.customer_phone || "").trim();
+
     if (!msisdn) {
       return json({ error: "Phone number is required." }, 400);
     }
@@ -93,7 +100,9 @@ Deno.serve(async (req) => {
 
     if (paymentInsertError || !payment) {
       return json(
-        { error: paymentInsertError?.message || "Failed to create payment row." },
+        {
+          error: paymentInsertError?.message || "Failed to create payment row.",
+        },
         500,
       );
     }
@@ -111,54 +120,101 @@ Deno.serve(async (req) => {
     const responseDescription = stkResponse.ResponseDescription ?? null;
     const customerMessage = stkResponse.CustomerMessage ?? null;
 
+    const stkAccepted = String(responseCode) === "0";
+
+    if (!stkAccepted) {
+      await supabaseAdmin
+        .from("payments")
+        .update({
+          provider_reference: merchantRequestId,
+          merchant_request_id: merchantRequestId,
+          checkout_request_id: checkoutRequestId,
+          result_code: responseCode ? String(responseCode) : null,
+          result_desc: responseDescription,
+          raw_response: stkResponse,
+          status: "failed",
+          initiated_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", payment.id);
+
+      await supabaseAdmin
+        .from("orders")
+        .update({
+          status: "payment_failed",
+          payment_status: "failed",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", order.id);
+
+      return json(
+        {
+          success: false,
+          paymentId: payment.id,
+          orderId: order.id,
+          checkoutRequestId,
+          merchantRequestId,
+          responseCode,
+          responseDescription:
+            responseDescription || "M-Pesa STK Push was not accepted.",
+          customerMessage,
+        },
+        400,
+      );
+    }
+
+    const now = new Date().toISOString();
+
     const { error: paymentUpdateError } = await supabaseAdmin
       .from("payments")
       .update({
         provider_reference: merchantRequestId,
         merchant_request_id: merchantRequestId,
         checkout_request_id: checkoutRequestId,
-        result_code: responseCode ? String(responseCode) : null,
+        result_code: String(responseCode),
         result_desc: responseDescription,
         raw_response: stkResponse,
-        status: responseCode === "0" ? "processing" : "failed",
-        initiated_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        status: "processing",
+        initiated_at: now,
+        updated_at: now,
       })
       .eq("id", payment.id);
 
     if (paymentUpdateError) {
-      return json({ error: paymentUpdateError.message }, 500);
+      console.error("Post-STK payment update failed:", paymentUpdateError);
     }
-
-    const nextOrderStatus = responseCode === "0" ? "awaiting_payment" : "payment_failed";
-    const nextPaymentStatus = responseCode === "0" ? "processing" : "failed";
 
     const { error: orderUpdateError } = await supabaseAdmin
       .from("orders")
       .update({
-        status: nextOrderStatus,
-        payment_status: nextPaymentStatus,
-        updated_at: new Date().toISOString(),
+        status: "awaiting_payment",
+        payment_status: "processing",
+        updated_at: now,
       })
       .eq("id", order.id);
 
     if (orderUpdateError) {
-      return json({ error: orderUpdateError.message }, 500);
+      console.error("Post-STK order update failed:", orderUpdateError);
     }
 
     return json({
-      success: responseCode === "0",
+      success: true,
       paymentId: payment.id,
       orderId: order.id,
       checkoutRequestId,
       merchantRequestId,
       responseCode,
       responseDescription,
-      customerMessage,
+      customerMessage:
+        customerMessage || "M-Pesa STK Push sent. Complete payment on your phone.",
     });
   } catch (error) {
+    console.error("initiate-mpesa-stk error:", error);
+
     return json(
-      { error: error instanceof Error ? error.message : "Unknown error." },
+      {
+        error: error instanceof Error ? error.message : "Unknown error.",
+      },
       500,
     );
   }
