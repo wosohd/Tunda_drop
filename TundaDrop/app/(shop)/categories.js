@@ -1,15 +1,20 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   View,
   ScrollView,
   Pressable,
   Image,
   Animated,
+  ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { CATEGORIES, PRODUCTS } from "../../src/constants/mockData";
+
+import { getCategories, getProducts } from "../../src/lib/sanityQueries";
 import { TText } from "../../src/components/ui/TText";
+
+const FALLBACK_IMAGE =
+  "https://images.unsplash.com/photo-1505252585461-04db1eb84625?auto=format&fit=crop&w=1200&q=60";
 
 function ScalePress({ children, onPress }) {
   const scale = useRef(new Animated.Value(1)).current;
@@ -31,14 +36,79 @@ function ScalePress({ children, onPress }) {
   );
 }
 
+function getStartingPrice(product) {
+  const prices = (product?.variants ?? [])
+    .map((variant) => Number(variant.price))
+    .filter((price) => Number.isFinite(price));
+
+  if (!prices.length) return 0;
+
+  return Math.min(...prices);
+}
+
 export default function Categories() {
   const router = useRouter();
-  const [active, setActive] = useState(CATEGORIES[0].id);
+  const params = useLocalSearchParams();
 
-  const filtered = useMemo(
-    () => PRODUCTS.filter((p) => p.category === active),
-    [active]
-  );
+  const [active, setActive] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadData() {
+      try {
+        setIsLoading(true);
+
+        const [categoryResults, productResults] = await Promise.all([
+          getCategories(),
+          getProducts(),
+        ]);
+
+        if (!isMounted) return;
+
+        setCategories(categoryResults ?? []);
+        setProducts(productResults ?? []);
+
+        const initialCategory =
+          params?.category ||
+          categoryResults?.[0]?.id ||
+          null;
+
+        setActive(initialCategory);
+      } catch (error) {
+        console.warn("Failed to load Sanity category data:", error);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [params?.category]);
+
+  const filtered = useMemo(() => {
+    if (!active) return [];
+    return products.filter((p) => p.category === active);
+  }, [active, products]);
+
+  if (isLoading) {
+    return (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator />
+        <TText muted style={{ marginTop: 10 }}>
+          Loading categories...
+        </TText>
+      </View>
+    );
+  }
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
@@ -50,10 +120,9 @@ export default function Categories() {
         Fresh blends, quick delivery. Tap a category to explore.
       </TText>
 
-      {/* Category pills */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View style={{ flexDirection: "row", gap: 10, paddingBottom: 12 }}>
-          {CATEGORIES.map((c) => {
+          {categories.map((c) => {
             const isActive = c.id === active;
             return (
               <ScalePress key={c.id} onPress={() => setActive(c.id)}>
@@ -87,12 +156,11 @@ export default function Categories() {
         </View>
       </ScrollView>
 
-      {/* Products */}
       <View style={{ gap: 12, paddingBottom: 24 }}>
         {filtered.map((p) => (
           <ScalePress
             key={p.id}
-            onPress={() => router.push(`/(shop)/product/${p.id}`)}
+            onPress={() => router.push(`/product/${p.id}`)}
           >
             <View
               style={{
@@ -104,7 +172,7 @@ export default function Categories() {
               }}
             >
               <Image
-                source={{ uri: p.image }}
+                source={{ uri: p.image || FALLBACK_IMAGE }}
                 style={{ height: 140, width: "100%" }}
               />
 
@@ -144,12 +212,16 @@ export default function Categories() {
                 </TText>
 
                 <TText style={{ marginTop: 10, fontWeight: "900" }}>
-                  From KES {p.variants[0].price}
+                  From KES {getStartingPrice(p)}
                 </TText>
               </View>
             </View>
           </ScalePress>
         ))}
+
+        {!filtered.length && (
+          <TText muted>No products found in this category yet.</TText>
+        )}
       </View>
     </ScrollView>
   );

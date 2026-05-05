@@ -19,7 +19,20 @@ export async function createStripePaymentIntent({
     throw new Error("Missing EXPO_PUBLIC_API_URL in the mobile app .env file.");
   }
 
-  const amount = getStripeAmountFromKes(amountKes);
+  const minimumStripeAmountKes = 100;
+  const numericAmountKes = Number(amountKes);
+
+  if (!Number.isFinite(numericAmountKes) || numericAmountKes <= 0) {
+    throw new Error("Invalid card payment amount.");
+  }
+
+  if (numericAmountKes < minimumStripeAmountKes) {
+    throw new Error(
+      "Minimum card payment is KES 100. Please add another item or use M-Pesa."
+    );
+  }
+
+  const amount = getStripeAmountFromKes(numericAmountKes);
 
   const response = await fetch(`${API_URL}/stripe/create-payment-intent`, {
     method: "POST",
