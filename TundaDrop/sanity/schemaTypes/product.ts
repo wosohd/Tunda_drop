@@ -53,6 +53,15 @@ export const product = defineType({
       options: {
         hotspot: true,
       },
+      description:
+        "Preferred product image. If empty, the app will use External Image URL.",
+    }),
+    defineField({
+      name: "externalImageUrl",
+      title: "External Image URL",
+      type: "url",
+      description:
+        "Optional image URL, e.g. Unsplash. Used if no Sanity Main Image is uploaded.",
     }),
     defineField({
       name: "gallery",

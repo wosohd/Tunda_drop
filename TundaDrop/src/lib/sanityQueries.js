@@ -14,7 +14,8 @@ const PRODUCT_FIELDS = `
   sortOrder,
   "category": category->categoryId,
   "categoryTitle": category->title,
-  "image": mainImage.asset->url,
+  "image": coalesce(mainImage.asset->url, externalImageUrl),
+  externalImageUrl,
   variants[]{
     _key,
     sizeLabel,
