@@ -1,10 +1,11 @@
 import { Stack, usePathname, useRouter } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { View, ActivityIndicator, Pressable, Text, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { StripeProvider } from "@stripe/stripe-react-native";
 
+import SplashIntro from "../src/components/SplashIntro";
 import { useAuthStore } from "../src/store/authStore";
 import { useThemeStore } from "../src/store/themeStore";
 import { useThemeTokens } from "../src/theme/useTheme";
@@ -14,6 +15,8 @@ const AUTH_ONLY_PREFIXES = ["/checkout", "/orders", "/order"];
 export default function RootLayout() {
   const pathname = usePathname();
   const router = useRouter();
+
+  const [showIntro, setShowIntro] = useState(true);
 
   const user = useAuthStore((s) => s.user);
   const isAuthHydrating = useAuthStore((s) => s.isHydrating);
@@ -134,7 +137,11 @@ export default function RootLayout() {
               backgroundColor: t.bg,
             }}
           >
-            <ActivityIndicator />
+            {showIntro ? (
+              <SplashIntro onFinish={() => setShowIntro(false)} />
+            ) : (
+              <ActivityIndicator />
+            )}
           </View>
         </SafeAreaProvider>
       </StripeProvider>
@@ -144,45 +151,79 @@ export default function RootLayout() {
   return (
     <StripeProvider publishableKey={stripePublishableKey}>
       <SafeAreaProvider>
-        <Stack
-          screenOptions={{
-            headerTitleAlign: "center",
-            contentStyle: { padding: 16, backgroundColor: t.bg },
-            headerStyle: { backgroundColor: t.bg },
-            headerTintColor: t.text,
-          }}
-        >
-          <Stack.Screen
-            name="index"
-            options={{
-              title: "TundaDrop",
-              headerRight: () => <HeaderRightHome />,
+        <View style={{ flex: 1, backgroundColor: t.bg }}>
+          <Stack
+            screenOptions={{
+              headerTitleAlign: "center",
+              contentStyle: { padding: 16, backgroundColor: t.bg },
+              headerStyle: { backgroundColor: t.bg },
+              headerTintColor: t.text,
             }}
-          />
+          >
+            <Stack.Screen
+              name="index"
+              options={{
+                title: "TundaDrop",
+                headerRight: () => <HeaderRightHome />,
+              }}
+            />
 
-          <Stack.Screen name="(auth)/login" options={{ title: "Login" }} />
-          <Stack.Screen
-            name="(auth)/register"
-            options={{ title: "Create account" }}
-          />
+            <Stack.Screen
+              name="(auth)/login"
+              options={{
+                headerShown: false,
+                contentStyle: { padding: 0, backgroundColor: t.bg },
+              }}
+            />
 
-          <Stack.Screen
-            name="(shop)/categories"
-            options={{ title: "Categories" }}
-          />
-          <Stack.Screen
-            name="(shop)/product/[id]"
-            options={{ title: "Product" }}
-          />
-          <Stack.Screen name="(shop)/cart" options={{ title: "Cart" }} />
-          <Stack.Screen
-            name="(shop)/checkout"
-            options={{ title: "Checkout" }}
-          />
+            <Stack.Screen
+              name="(auth)/register"
+              options={{
+                headerShown: false,
+                contentStyle: { padding: 0, backgroundColor: t.bg },
+              }}
+            />
 
-          <Stack.Screen name="(orders)/orders" options={{ title: "My Orders" }} />
-          <Stack.Screen name="(orders)/order/[id]" options={{ title: "Order" }} />
-        </Stack>
+            <Stack.Screen
+              name="(auth)/reset-password"
+              options={{
+                headerShown: false,
+                contentStyle: { padding: 0, backgroundColor: t.bg },
+              }}
+            />
+
+            <Stack.Screen
+              name="(shop)/categories"
+              options={{ title: "Categories" }}
+            />
+
+            <Stack.Screen
+              name="(shop)/product/[id]"
+              options={{ title: "Product" }}
+            />
+
+            <Stack.Screen name="(shop)/cart" options={{ title: "Cart" }} />
+
+            <Stack.Screen
+              name="(shop)/checkout"
+              options={{ title: "Checkout" }}
+            />
+
+            <Stack.Screen
+              name="(orders)/orders"
+              options={{ title: "My Orders" }}
+            />
+
+            <Stack.Screen
+              name="(orders)/order/[id]"
+              options={{ title: "Order" }}
+            />
+          </Stack>
+
+          {showIntro ? (
+            <SplashIntro onFinish={() => setShowIntro(false)} />
+          ) : null}
+        </View>
       </SafeAreaProvider>
     </StripeProvider>
   );

@@ -1,10 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   ScrollView,
-  Pressable,
   Image,
-  Animated,
   ActivityIndicator,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -12,29 +10,14 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { getCategories, getProducts } from "../../src/lib/sanityQueries";
 import { TText } from "../../src/components/ui/TText";
+import ScreenShell from "../../src/components/ui/ScreenShell";
+import GlassCard from "../../src/components/ui/GlassCard";
+import TChip from "../../src/components/ui/TChip";
+import ScalePress from "../../src/components/ui/ScalePress";
+import { useThemeTokens } from "../../src/theme/useTheme";
 
 const FALLBACK_IMAGE =
   "https://images.unsplash.com/photo-1505252585461-04db1eb84625?auto=format&fit=crop&w=1200&q=60";
-
-function ScalePress({ children, onPress }) {
-  const scale = useRef(new Animated.Value(1)).current;
-
-  return (
-    <Animated.View style={{ transform: [{ scale }] }}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={() =>
-          Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()
-        }
-        onPressOut={() =>
-          Animated.spring(scale, { toValue: 1, useNativeDriver: true }).start()
-        }
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
 
 function getStartingPrice(product) {
   const prices = (product?.variants ?? [])
@@ -49,11 +32,22 @@ function getStartingPrice(product) {
 export default function Categories() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const t = useThemeTokens();
 
   const [active, setActive] = useState(null);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
+  const productTitleColor = isDarkMode ? "#FFFFFF" : "#111827";
+  const productPriceColor = isDarkMode ? "#FFFFFF" : "#111827";
+
+  const openButtonBg = isDarkMode ? "#FFFFFF" : "#111827";
+  const openButtonText = isDarkMode ? "#111827" : "#FFFFFF";
 
   useEffect(() => {
     let isMounted = true;
@@ -72,10 +66,7 @@ export default function Categories() {
         setCategories(categoryResults ?? []);
         setProducts(productResults ?? []);
 
-        const initialCategory =
-          params?.category ||
-          categoryResults?.[0]?.id ||
-          null;
+        const initialCategory = params?.category || categoryResults?.[0]?.id || null;
 
         setActive(initialCategory);
       } catch (error) {
@@ -101,56 +92,40 @@ export default function Categories() {
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator />
-        <TText muted style={{ marginTop: 10 }}>
-          Loading categories...
-        </TText>
-      </View>
+      <ScreenShell scroll={false}>
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator />
+          <TText muted style={{ marginTop: 10 }}>
+            Loading categories...
+          </TText>
+        </View>
+      </ScreenShell>
     );
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false}>
-      <TText style={{ fontSize: 20, fontWeight: "900", marginBottom: 8 }}>
+    <ScreenShell contentContainerStyle={{ paddingHorizontal: 0 }}>
+      <TText style={{ fontSize: 22, fontWeight: "950", marginBottom: 8 }}>
         Pick a vibe
       </TText>
 
-      <TText muted style={{ marginBottom: 12 }}>
+      <TText muted style={{ marginBottom: 14, lineHeight: 21 }}>
         Fresh blends, quick delivery. Tap a category to explore.
       </TText>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={{ flexDirection: "row", gap: 10, paddingBottom: 12 }}>
+        <View style={{ flexDirection: "row", gap: 10, paddingBottom: 14 }}>
           {categories.map((c) => {
             const isActive = c.id === active;
-            return (
-              <ScalePress key={c.id} onPress={() => setActive(c.id)}>
-                <View
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 10,
-                    borderRadius: 16,
-                    backgroundColor: isActive ? "#111827" : "#F4F6FF",
-                    borderWidth: 1,
-                    borderColor: isActive ? "#111827" : "#E7EBFF",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <TText style={{ fontSize: 16 }}>{c.emoji}</TText>
 
-                  <TText
-                    style={{
-                      fontWeight: "900",
-                      color: isActive ? "#fff" : undefined,
-                    }}
-                  >
-                    {c.title}
-                  </TText>
-                </View>
-              </ScalePress>
+            return (
+              <TChip
+                key={c.id}
+                label={c.title}
+                emoji={c.emoji}
+                active={isActive}
+                onPress={() => setActive(c.id)}
+              />
             );
           })}
         </View>
@@ -162,18 +137,10 @@ export default function Categories() {
             key={p.id}
             onPress={() => router.push(`/product/${p.id}`)}
           >
-            <View
-              style={{
-                borderRadius: 22,
-                overflow: "hidden",
-                backgroundColor: "#fff",
-                borderWidth: 1,
-                borderColor: "#EEF1FF",
-              }}
-            >
+            <GlassCard padding={0} radius={24} style={{ overflow: "hidden" }}>
               <Image
                 source={{ uri: p.image || FALLBACK_IMAGE }}
-                style={{ height: 140, width: "100%" }}
+                style={{ height: 145, width: "100%" }}
               />
 
               <View style={{ padding: 14 }}>
@@ -185,7 +152,14 @@ export default function Categories() {
                     gap: 10,
                   }}
                 >
-                  <TText style={{ fontSize: 16, fontWeight: "900", flex: 1 }}>
+                  <TText
+                    style={{
+                      fontSize: 16,
+                      fontWeight: "950",
+                      flex: 1,
+                      color: productTitleColor,
+                    }}
+                  >
                     {p.name}
                   </TText>
 
@@ -194,35 +168,53 @@ export default function Categories() {
                       paddingHorizontal: 10,
                       paddingVertical: 8,
                       borderRadius: 14,
-                      backgroundColor: "#111827",
+                      backgroundColor: openButtonBg,
                       flexDirection: "row",
                       alignItems: "center",
                       gap: 6,
                     }}
                   >
-                    <Ionicons name="arrow-forward" size={16} color="#fff" />
-                    <TText style={{ color: "#fff", fontWeight: "900" }}>
+                    <Ionicons
+                      name="arrow-forward"
+                      size={16}
+                      color={openButtonText}
+                    />
+
+                    <TText
+                      style={{
+                        color: openButtonText,
+                        fontWeight: "900",
+                      }}
+                    >
                       Open
                     </TText>
                   </View>
                 </View>
 
-                <TText muted style={{ marginTop: 6 }} numberOfLines={2}>
+                <TText muted style={{ marginTop: 6, lineHeight: 20 }} numberOfLines={2}>
                   {p.description}
                 </TText>
 
-                <TText style={{ marginTop: 10, fontWeight: "900" }}>
+                <TText
+                  style={{
+                    marginTop: 10,
+                    fontWeight: "950",
+                    color: productPriceColor,
+                  }}
+                >
                   From KES {getStartingPrice(p)}
                 </TText>
               </View>
-            </View>
+            </GlassCard>
           </ScalePress>
         ))}
 
         {!filtered.length && (
-          <TText muted>No products found in this category yet.</TText>
+          <GlassCard>
+            <TText muted>No products found in this category yet.</TText>
+          </GlassCard>
         )}
       </View>
-    </ScrollView>
+    </ScreenShell>
   );
 }

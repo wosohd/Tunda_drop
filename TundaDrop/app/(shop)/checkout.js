@@ -1,13 +1,9 @@
-import React, { useMemo, useRef, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import {
   View,
-  ScrollView,
-  Pressable,
   TextInput,
-  Animated,
   Alert,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useStripe } from "@stripe/stripe-react-native";
@@ -20,40 +16,33 @@ import { TText } from "../../src/components/ui/TText";
 import { useAuthStore } from "../../src/store/authStore";
 import { createOrder } from "../../src/lib/orders/createOrder";
 import { createStripePaymentIntent } from "../../src/lib/stripeService";
+import { useThemeTokens } from "../../src/theme/useTheme";
+
+import ScreenShell from "../../src/components/ui/ScreenShell";
+import GlassCard from "../../src/components/ui/GlassCard";
+import TChip from "../../src/components/ui/TChip";
+import ScalePress from "../../src/components/ui/ScalePress";
+import GradientButton from "../../src/components/ui/GradientButton";
 
 const DISCOUNT_PERCENT_TEST = 10;
 
-function ScalePress({ children, onPress, style, disabled }) {
-  const scale = useRef(new Animated.Value(1)).current;
+function getCustomMixText(item) {
+  const flavors = item?.customization?.selectedFlavors ?? [];
 
-  return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
-      <Pressable
-        disabled={disabled}
-        onPressIn={() =>
-          Animated.spring(scale, {
-            toValue: 0.97,
-            useNativeDriver: true,
-          }).start()
-        }
-        onPressOut={() =>
-          Animated.spring(scale, {
-            toValue: 1,
-            useNativeDriver: true,
-          }).start()
-        }
-        onPress={onPress}
-        style={{ flex: 1, opacity: disabled ? 0.65 : 1 }}
-      >
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
+  return flavors
+    .map((flavor) => flavor?.name)
+    .filter(Boolean)
+    .join(" + ");
+}
+
+function getCustomMixNote(item) {
+  return item?.customization?.note?.trim?.() || "";
 }
 
 export default function Checkout() {
   const router = useRouter();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
+  const t = useThemeTokens();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -78,6 +67,15 @@ export default function Checkout() {
   const setAddress = useCheckoutStore((s) => s.setAddress);
   const setPhone = useCheckoutStore((s) => s.setPhone);
   const setPaymentMethod = useCheckoutStore((s) => s.setPaymentMethod);
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
+  const textColor = isDarkMode ? "#FFFFFF" : "#111827";
+  const mutedTextColor = isDarkMode ? "#CBD5E1" : "#64748B";
+  const softBorder = isDarkMode ? "#334155" : "#E7EBFF";
+  const successText = isDarkMode ? "#BBF7D0" : "#166534";
 
   const zone = useMemo(
     () => DELIVERY_ZONES.find((z) => z.id === zoneId) ?? DELIVERY_ZONES[0],
@@ -181,7 +179,7 @@ export default function Checkout() {
     if (!canPlace) {
       Alert.alert(
         "Missing info",
-        "Please confirm delivery zone, address, and phone number."
+        "Please confirm delivery zone, address, phone number, and payment method."
       );
       return;
     }
@@ -252,148 +250,276 @@ export default function Checkout() {
 
   const payLabel = paymentMethod ? paymentMethod.toUpperCase() : "PAY";
 
-  return (
-    <LinearGradient
-      colors={["#F7FBF8", "#EEF8F2", "#FDFDFD"]}
-      style={{ flex: 1 }}
-    >
-      <ScrollView
-        contentContainerStyle={{ padding: 16, paddingBottom: 36 }}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={{ marginTop: 26, marginBottom: 18 }}>
-          <TText weight="bold" style={{ fontSize: 28, color: "#0F172A" }}>
-            Checkout
-          </TText>
-          <TText style={{ marginTop: 6, color: "#475569", lineHeight: 22 }}>
-            Choose a delivery zone, add your details, then pay.
-          </TText>
-        </View>
+  const payTitle = isSubmitting
+    ? paymentMethod === "card"
+      ? "Processing card..."
+      : "Saving order..."
+    : `Pay ${payLabel} • KES ${totals.totalKes}`;
 
-        <SectionTitle icon="location-outline" title="Delivery zone" />
-        <View style={{ gap: 12, marginBottom: 18 }}>
-          {DELIVERY_ZONES.map((z) => {
-            const active = z.id === zoneId;
-            return (
-              <ScalePress
-                key={z.id}
-                onPress={() => setZoneId(z.id)}
-                style={{ borderRadius: 18 }}
+  return (
+    <ScreenShell contentContainerStyle={{ paddingHorizontal: 0 }}>
+      <View style={{ marginTop: 4, marginBottom: 18 }}>
+        <TText style={{ fontSize: 28, fontWeight: "950", color: textColor }}>
+          Checkout
+        </TText>
+
+        <TText
+          style={{
+            marginTop: 6,
+            color: mutedTextColor,
+            lineHeight: 22,
+          }}
+        >
+          Choose your delivery zone, confirm your details, then complete payment.
+        </TText>
+      </View>
+
+      <SectionTitle icon="basket-outline" title="Your order" />
+      <View style={{ gap: 10, marginBottom: 18 }}>
+        {items.map((item) => {
+          const customMixText = getCustomMixText(item);
+          const customMixNote = getCustomMixNote(item);
+          const hasCustomMix = Boolean(customMixText);
+
+          return (
+            <GlassCard key={item.key} style={{ gap: 8 }}>
+              <View
+                style={{
+                  flexDirection: "row",
+                  justifyContent: "space-between",
+                  gap: 12,
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <TText
+                    style={{
+                      color: textColor,
+                      fontWeight: "950",
+                      fontSize: 15,
+                    }}
+                  >
+                    {item.name}
+                  </TText>
+
+                  <TText
+                    style={{
+                      color: mutedTextColor,
+                      marginTop: 3,
+                      fontWeight: "700",
+                    }}
+                  >
+                    {item.sizeLabel} • Qty {item.quantity} • KES{" "}
+                    {item.unitPriceKes} each
+                  </TText>
+                </View>
+
+                <TText style={{ color: textColor, fontWeight: "950" }}>
+                  KES {item.unitPriceKes * item.quantity}
+                </TText>
+              </View>
+
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                <TChip label={item.sizeLabel} icon="cube-outline" />
+                {hasCustomMix ? (
+                  <TChip label="Custom mix" icon="flask" variant="success" />
+                ) : null}
+              </View>
+
+              {hasCustomMix ? (
+                <View
+                  style={{
+                    padding: 10,
+                    borderRadius: 16,
+                    backgroundColor: isDarkMode
+                      ? "rgba(20,83,45,0.26)"
+                      : "#F0FDF4",
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? "#166534" : "#BBF7D0",
+                  }}
+                >
+                  <TText
+                    style={{
+                      color: successText,
+                      fontWeight: "900",
+                      lineHeight: 20,
+                    }}
+                  >
+                    Mix: {customMixText}
+                  </TText>
+
+                  {customMixNote ? (
+                    <TText
+                      style={{
+                        color: successText,
+                        marginTop: 4,
+                        lineHeight: 19,
+                      }}
+                    >
+                      Note: {customMixNote}
+                    </TText>
+                  ) : null}
+                </View>
+              ) : null}
+            </GlassCard>
+          );
+        })}
+
+        {!items.length ? (
+          <GlassCard>
+            <TText muted>Your cart is empty.</TText>
+          </GlassCard>
+        ) : null}
+      </View>
+
+      <SectionTitle icon="location-outline" title="Delivery zone" />
+      <View style={{ gap: 12, marginBottom: 18 }}>
+        {DELIVERY_ZONES.map((z) => {
+          const active = z.id === zoneId;
+
+          return (
+            <ScalePress
+              key={z.id}
+              onPress={() => setZoneId(z.id)}
+              style={{ borderRadius: 18 }}
+            >
+              <GlassCard
+                style={{
+                  borderColor: active ? "#22C55E" : softBorder,
+                  backgroundColor: active
+                    ? isDarkMode
+                      ? "rgba(20,83,45,0.36)"
+                      : "#F0FDF4"
+                    : undefined,
+                }}
               >
                 <View
                   style={{
-                    borderRadius: 18,
-                    padding: 14,
-                    borderWidth: 1.2,
-                    borderColor: active ? "#22C55E" : "#D7E5DB",
-                    backgroundColor: active ? "#F0FDF4" : "#FFFFFF",
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    gap: 10,
                   }}
                 >
-                  <TText weight="semibold" style={{ color: "#0F172A" }}>
-                    {z.title} • {z.rangeLabel}
-                  </TText>
-                  <TText style={{ color: "#64748B", marginTop: 4 }}>
-                    {z.note}
-                  </TText>
-                  <TText
-                    weight="bold"
-                    style={{ color: "#166534", marginTop: 8 }}
-                  >
-                    KES {z.feeKes}
-                  </TText>
+                  <View style={{ flex: 1 }}>
+                    <TText style={{ color: textColor, fontWeight: "950" }}>
+                      {z.title} • {z.rangeLabel}
+                    </TText>
+
+                    <TText
+                      style={{
+                        color: mutedTextColor,
+                        marginTop: 4,
+                        lineHeight: 20,
+                      }}
+                    >
+                      {z.note}
+                    </TText>
+
+                    <TText
+                      style={{
+                        color: successText,
+                        marginTop: 8,
+                        fontWeight: "950",
+                      }}
+                    >
+                      KES {z.feeKes}
+                    </TText>
+                  </View>
+
+                  <Ionicons
+                    name={active ? "radio-button-on" : "radio-button-off"}
+                    size={21}
+                    color={active ? "#22C55E" : "#94A3B8"}
+                  />
                 </View>
-              </ScalePress>
-            );
-          })}
-        </View>
+              </GlassCard>
+            </ScalePress>
+          );
+        })}
+      </View>
 
-        <SectionTitle icon="home-outline" title="Delivery details" />
-        <View style={{ gap: 12, marginBottom: 18 }}>
-          <Field
-            label="Address"
-            value={address}
-            onChangeText={setAddress}
-            placeholder="Enter delivery address"
-            multiline
-          />
-          <Field
-            label="Phone number"
-            value={phone}
-            onChangeText={setPhone}
-            placeholder="e.g. 07XXXXXXXX"
-            keyboardType="phone-pad"
-          />
-        </View>
+      <SectionTitle icon="home-outline" title="Delivery details" />
+      <View style={{ gap: 12, marginBottom: 18 }}>
+        <Field
+          label="Address"
+          value={address}
+          onChangeText={setAddress}
+          placeholder="Enter delivery address"
+          multiline
+        />
 
-        <SectionTitle icon="card-outline" title="Payment method" />
-        <View style={{ gap: 12, marginBottom: 18 }}>
-          <PayChoice
-            active={paymentMethod === "mpesa"}
-            title="M-Pesa"
-            subtitle="Pay with STK Push or Till later"
-            icon="phone-portrait-outline"
-            onPress={() => setPaymentMethod("mpesa")}
-          />
-          <PayChoice
-            active={paymentMethod === "card"}
-            title="Card"
-            subtitle="Pay securely with Stripe"
-            icon="card-outline"
-            onPress={() => setPaymentMethod("card")}
-          />
-        </View>
+        <Field
+          label="Phone number"
+          value={phone}
+          onChangeText={setPhone}
+          placeholder="e.g. 07XXXXXXXX"
+          keyboardType="phone-pad"
+        />
+      </View>
 
-        <SectionTitle icon="receipt-outline" title="Summary" />
+      <SectionTitle icon="card-outline" title="Payment method" />
+      <View style={{ gap: 12, marginBottom: 18 }}>
+        <PayChoice
+          active={paymentMethod === "mpesa"}
+          title="M-Pesa"
+          subtitle="Pay with STK Push or Till later"
+          icon="phone-portrait-outline"
+          onPress={() => setPaymentMethod("mpesa")}
+        />
+
+        <PayChoice
+          active={paymentMethod === "card"}
+          title="Card"
+          subtitle="Pay securely with Stripe"
+          icon="card-outline"
+          onPress={() => setPaymentMethod("card")}
+        />
+      </View>
+
+      <SectionTitle icon="receipt-outline" title="Summary" />
+      <GlassCard style={{ marginBottom: 20, gap: 10 }}>
+        <Row label="Subtotal" value={`KES ${totals.subtotalKes}`} />
+        <Row label="Discount" value={`- KES ${totals.discountKes}`} />
+        <Row label="Delivery" value={`KES ${totals.deliveryFeeKes}`} />
+
         <View
           style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: 18,
-            padding: 14,
-            borderWidth: 1,
-            borderColor: "#E5E7EB",
-            marginBottom: 20,
-            gap: 10,
+            height: 1,
+            backgroundColor: softBorder,
+            marginVertical: 4,
           }}
-        >
-          <Row label="Subtotal" value={`KES ${totals.subtotalKes}`} />
-          <Row label="Discount" value={`- KES ${totals.discountKes}`} />
-          <Row label="Delivery" value={`KES ${totals.deliveryFeeKes}`} />
-          <View
-            style={{
-              height: 1,
-              backgroundColor: "#E5E7EB",
-              marginVertical: 4,
-            }}
-          />
-          <Row strong label="Total" value={`KES ${totals.totalKes}`} />
-        </View>
+        />
 
-        <ScalePress onPress={handleCreateOrder} disabled={!canPlace}>
-          <LinearGradient
-            colors={["#16A34A", "#22C55E"]}
-            style={{
-              borderRadius: 18,
-              paddingVertical: 16,
-              paddingHorizontal: 16,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <TText weight="bold" style={{ color: "white", fontSize: 16 }}>
-              {isSubmitting
-                ? paymentMethod === "card"
-                  ? "Processing card..."
-                  : "Saving order..."
-                : `Pay ${payLabel} • KES ${totals.totalKes}`}
-            </TText>
-          </LinearGradient>
-        </ScalePress>
-      </ScrollView>
-    </LinearGradient>
+        <Row strong label="Total" value={`KES ${totals.totalKes}`} />
+      </GlassCard>
+
+      <GradientButton
+        title={payTitle}
+        onPress={handleCreateOrder}
+        disabled={!canPlace}
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <Ionicons
+              name={paymentMethod === "mpesa" ? "phone-portrait-outline" : "card"}
+              size={18}
+              color="#fff"
+            />
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
+          </View>
+        }
+      />
+
+      <View style={{ height: 28 }} />
+    </ScreenShell>
   );
 }
 
 function SectionTitle({ icon, title }) {
+  const t = useThemeTokens();
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
   return (
     <View
       style={{
@@ -403,8 +529,13 @@ function SectionTitle({ icon, title }) {
         marginBottom: 10,
       }}
     >
-      <Ionicons name={icon} size={18} color="#166534" />
-      <TText weight="bold" style={{ fontSize: 16, color: "#0F172A" }}>
+      <Ionicons
+        name={icon}
+        size={18}
+        color={isDarkMode ? "#B7F34B" : "#166534"}
+      />
+
+      <TText style={{ fontSize: 16, color: t.text, fontWeight: "950" }}>
         {title}
       </TText>
     </View>
@@ -419,14 +550,24 @@ function Field({
   keyboardType,
   multiline,
 }) {
+  const t = useThemeTokens();
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
   return (
-    <View>
+    <GlassCard style={{ gap: 7 }}>
       <TText
-        weight="semibold"
-        style={{ color: "#0F172A", marginBottom: 6, fontSize: 14 }}
+        style={{
+          color: t.text,
+          fontWeight: "900",
+          fontSize: 14,
+        }}
       >
         {label}
       </TText>
+
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -434,30 +575,49 @@ function Field({
         keyboardType={keyboardType}
         multiline={multiline}
         style={{
-          backgroundColor: "#FFFFFF",
+          backgroundColor: isDarkMode ? "#0F172A" : "#FFFFFF",
           borderWidth: 1,
-          borderColor: "#D7E5DB",
+          borderColor: isDarkMode ? "#334155" : "#D7E5DB",
           borderRadius: 16,
           paddingHorizontal: 14,
           paddingVertical: multiline ? 14 : 12,
           minHeight: multiline ? 96 : undefined,
           textAlignVertical: multiline ? "top" : "center",
-          color: "#0F172A",
+          color: isDarkMode ? "#FFFFFF" : "#0F172A",
+          fontWeight: "700",
         }}
         placeholderTextColor="#94A3B8"
       />
-    </View>
+    </GlassCard>
   );
 }
 
 function PayChoice({ active, title, subtitle, icon, onPress }) {
+  const t = useThemeTokens();
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
+  const activeBg = isDarkMode ? "rgba(20,83,45,0.36)" : "#F0FDF4";
+  const inactiveBg = isDarkMode ? "rgba(15,23,42,0.88)" : "#FFFFFF";
+  const activeBorder = "#22C55E";
+  const inactiveBorder = isDarkMode ? "#334155" : "#D7E5DB";
+  const iconBg = active
+    ? isDarkMode
+      ? "rgba(34,197,94,0.18)"
+      : "#DCFCE7"
+    : isDarkMode
+      ? "#111827"
+      : "#F1F5F9";
+
   return (
     <ScalePress onPress={onPress}>
       <View
         style={{
-          backgroundColor: active ? "#F0FDF4" : "#FFFFFF",
+          backgroundColor: active ? activeBg : inactiveBg,
           borderWidth: 1.2,
-          borderColor: active ? "#22C55E" : "#D7E5DB",
+          borderColor: active ? activeBorder : inactiveBorder,
           borderRadius: 18,
           padding: 14,
           flexDirection: "row",
@@ -472,27 +632,36 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
             borderRadius: 999,
             alignItems: "center",
             justifyContent: "center",
-            backgroundColor: active ? "#DCFCE7" : "#F1F5F9",
+            backgroundColor: iconBg,
           }}
         >
           <Ionicons
             name={icon}
             size={20}
-            color={active ? "#166534" : "#475569"}
+            color={active ? "#22C55E" : isDarkMode ? "#CBD5E1" : "#475569"}
           />
         </View>
 
         <View style={{ flex: 1 }}>
-          <TText weight="semibold" style={{ color: "#0F172A" }}>
+          <TText style={{ color: t.text, fontWeight: "950" }}>
             {title}
           </TText>
-          <TText style={{ color: "#64748B", marginTop: 2 }}>{subtitle}</TText>
+
+          <TText
+            style={{
+              color: t.mutedText,
+              marginTop: 2,
+              lineHeight: 19,
+            }}
+          >
+            {subtitle}
+          </TText>
         </View>
 
         <Ionicons
           name={active ? "radio-button-on" : "radio-button-off"}
           size={20}
-          color={active ? "#16A34A" : "#94A3B8"}
+          color={active ? "#22C55E" : "#94A3B8"}
         />
       </View>
     </ScalePress>
@@ -500,24 +669,37 @@ function PayChoice({ active, title, subtitle, icon, onPress }) {
 }
 
 function Row({ label, value, strong }) {
+  const t = useThemeTokens();
+
+  const isDarkMode = ["#fff", "#ffffff", "white"].includes(
+    String(t.text || "").toLowerCase()
+  );
+
   return (
     <View
-      style={{ flexDirection: "row", justifyContent: "space-between", gap: 10 }}
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        gap: 10,
+      }}
     >
       <TText
-        weight={strong ? "bold" : "regular"}
-        style={{ color: strong ? "#0F172A" : "#475569" }}
+        style={{
+          color: strong ? t.text : t.mutedText,
+          fontWeight: strong ? "950" : "700",
+        }}
       >
         {label}
       </TText>
+
       <TText
-        weight={strong ? "bold" : "semibold"}
-        style={{ color: strong ? "#0F172A" : "#166534" }}
+        style={{
+          color: strong ? t.text : isDarkMode ? "#BBF7D0" : "#166534",
+          fontWeight: strong ? "950" : "900",
+        }}
       >
         {value}
       </TText>
     </View>
   );
 }
-
-
